@@ -46,7 +46,17 @@ public static class ImageTitleFormatter
         sb.Append(") "); 
         if (info.FileInfo is not null)
         {
-            sb.Append(info.FileInfo.Length.GetReadableFileSize());
+            // FileInfo.Length performs a fresh stat and throws FileNotFoundException when
+            // the file no longer exists (e.g. it was just renamed/moved by labeling). Guard
+            // so a stale FileInfo doesn't crash title generation.
+            try
+            {
+                sb.Append(info.FileInfo.Length.GetReadableFileSize());
+            }
+            catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException or IOException)
+            {
+                // File is gone/unavailable; omit the size rather than crashing.
+            }
         }
 
         var zoomString = FormatZoomPercentage(zoom);

@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Svg.Skia;
+using PicView.Avalonia.CustomControls;
 using PicView.Avalonia.UI;
 using PicView.Core.Localization;
 using PicView.Core.Sizing;
@@ -23,7 +24,7 @@ public partial class DragDropView : UserControl
     public bool IsDirectoryIconVisible => _directoryIcon != null && ParentPanel.Children.Contains(_directoryIcon);
     public bool IsZipIconVisible => _zipIcon != null && ParentPanel.Children.Contains(_zipIcon);
     
-    public DragDropView()
+    public DragDropView(MainWindow mainWindow)
     {
         if (Application.Current.DataContext is not CoreViewModel core)
         {
@@ -31,19 +32,19 @@ public partial class DragDropView : UserControl
         }
         DataContext = core.MainWindows.ActiveWindow.CurrentValue;
         InitializeComponent();
-        InitializeView();
+        InitializeView(mainWindow);
     }
 
-    private void InitializeView()
+    private void InitializeView(MainWindow mainWindow)
     {
         TxtDragToView.Text = TranslationManager.Translation.DropToLoad;
-        UpdateViewSize();
+        UpdateViewSize(mainWindow);
     }
 
-    private void UpdateViewSize()
+    private void UpdateViewSize(MainWindow mainWindow)
     {
-        Width = UIHelper.GetMainView.Bounds.Width;
-        Height = UIHelper.GetMainView.Bounds.Height;
+        Width = mainWindow.UIHelper.GetMainView.Bounds.Width;
+        Height = mainWindow.UIHelper.GetMainView.Bounds.Height;
     }
 
     private void AddIconToPanel(Control icon)
@@ -81,24 +82,29 @@ public partial class DragDropView : UserControl
         AddIconToPanel(_zipIcon);
     }
 
-    public void UpdateThumbnail(Bitmap image)
+    public void UpdateThumbnail(Bitmap image, MainWindow mainWindow)
     {
-        UpdateViewSize();
-        if (DataContext is not MainWindowViewModel vm || image is null) 
+        UpdateViewSize(mainWindow);
+        if (DataContext is not MainWindowViewModel vm || image is null)
+        {
             return;
+        }
 
-        var scale = CalculateScale(image.PixelSize.Width, image.PixelSize.Height, vm);
+        var scale = CalculateScale(image.PixelSize.Width, image.PixelSize.Height, vm, mainWindow);
         UpdateContentHolder(image, scale);
     }
 
-    public void UpdateSvgThumbnail(object svg)
+    public void UpdateSvgThumbnail(object svg, MainWindow mainWindow)
     {
-        UpdateViewSize();
-        if (DataContext is not MainWindowViewModel vm) return;
+        UpdateViewSize(mainWindow);
+        if (DataContext is not MainWindowViewModel vm)
+        {
+            return;
+        }
 
         var svgSource = SvgSource.Load(svg as string);
         var svgImage = new SvgImage { Source = svgSource };
-        var scale = CalculateScale(svgImage?.Size.Width ?? MaxSize, svgImage?.Size.Height ?? MaxSize, vm);
+        var scale = CalculateScale(svgImage?.Size.Width ?? MaxSize, svgImage?.Size.Height ?? MaxSize, vm, mainWindow);
 
         ContentHolder.Background = new ImageBrush { Opacity = 0.95 };
         ContentHolder.Child = new Image
@@ -110,12 +116,12 @@ public partial class DragDropView : UserControl
         ContentHolder.IsVisible = true;
     }
 
-    private static double CalculateScale(double width, double height, MainWindowViewModel vm)
+    private static double CalculateScale(double width, double height, MainWindowViewModel vm, MainWindow mainWindow)
     {
         var screen = ScreenHelper.ScreenSize;
         var padding = vm.BottombarHeight.CurrentValue + vm.TitlebarHeight.CurrentValue + 50;
-        var boxedWidth = UIHelper.GetMainView.Bounds.Width * screen.Scaling - padding;
-        var boxedHeight = UIHelper.GetMainView.Bounds.Height * screen.Scaling - padding;
+        var boxedWidth = mainWindow.UIHelper.GetMainView.Bounds.Width * screen.Scaling - padding;
+        var boxedHeight = mainWindow.UIHelper.GetMainView.Bounds.Height * screen.Scaling - padding;
         var scaledWidth = boxedWidth / width;
         var scaledHeight = boxedHeight / height;
         return Math.Min(scaledWidth, scaledHeight);

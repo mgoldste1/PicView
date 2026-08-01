@@ -1,5 +1,5 @@
 ﻿using Avalonia.Input.Platform;
-using PicView.Avalonia.StartUp;
+using PicView.Avalonia.CustomControls;
 using PicView.Core.DebugTools;
 using PicView.Core.ViewModels;
 
@@ -10,8 +10,7 @@ public static class ClipboardPasteOperations
     /// <summary>
     /// Pastes content from the clipboard
     /// </summary>
-    /// <param name="vm">The main view model</param>
-    public static async ValueTask<bool> Paste(MainWindowViewModel vm)
+    public static async ValueTask<bool> Paste(MainWindowViewModel vm, MainWindow mainWindow)
     {
         var clipboard = ClipboardService.GetClipboard();
         if (clipboard == null)
@@ -25,7 +24,7 @@ public static class ClipboardPasteOperations
             var files = await clipboard.TryGetFilesAsync();
             if (files != null)
             {
-                await ClipboardFileOperations.PasteFiles(files, vm);
+                await ClipboardFileOperations.ProcessStorageItems(files, vm, mainWindow).ConfigureAwait(false);
                 return true;
             }
 
@@ -37,7 +36,7 @@ public static class ClipboardPasteOperations
             }
 
             // Try to paste image data
-            await ClipboardImageOperations.PasteClipboardImage(vm);
+            await ClipboardImageOperations.PasteClipboardImage(vm, mainWindow);
         }
         catch (Exception ex)
         {

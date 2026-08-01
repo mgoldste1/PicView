@@ -3,48 +3,115 @@ using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Threading;
 using PicView.Avalonia.ColorManagement;
+using PicView.Avalonia.CustomControls;
 using PicView.Avalonia.Functions;
 using PicView.Avalonia.Navigation;
+using PicView.Avalonia.Navigation.Services;
 using PicView.Avalonia.UI;
 using PicView.Avalonia.Views.UC;
 using PicView.Avalonia.WindowBehavior;
 using PicView.Core.ColorHandling;
+using PicView.Core.DebugTools;
+using PicView.Core.Gallery;
 using PicView.Core.Localization;
 using PicView.Core.Sizing;
 using PicView.Core.ViewModels;
 
 namespace PicView.Avalonia.SettingsManagement;
+
 public static class SettingsUpdater
 {
     public static void InitializeSettings(MainWindowViewModel vm, bool settingsExists)
     {
-        Task.Run(() => LanguageUpdater.UpdateLanguageAsync(vm.Translation, settingsExists));
-        
-        vm.TitlebarHeight.Value = Settings.WindowProperties.Fullscreen
-                                       || !Settings.UIProperties.ShowInterface
-            ? 0
-            : SizeDefaults.MainTitlebarHeight;
-        vm.BottombarHeight.Value = Settings.WindowProperties.Fullscreen
-                                              || !Settings.UIProperties.ShowInterface
-            ? 0
-            : SizeDefaults.BottombarHeight;
-        vm.IsSideBySide.Value = Settings.ImageScaling.ShowImageSideBySide;
-        vm.IsUIShown.Value  = Settings.UIProperties.ShowInterface;
-        vm.IsTopToolbarShown.Value  = Settings.UIProperties.ShowInterface;
-        vm.IsBottomToolbarShown.Value   = Settings.UIProperties.ShowBottomNavBar &&
-                                    Settings.UIProperties.ShowInterface;
-        vm.IsFullscreen.Value  = Settings.WindowProperties.Fullscreen;
-        vm.GlobalSettings.BackgroundChoice.Value = Settings.UIProperties.BgColorChoice;
+        ServiceHelper.SetAvaloniaImageLoader();
+        ServiceHelper.SetGalleryLoader();
+        Task.Run(() =>
+        {
+            _ = LanguageUpdater.UpdateLanguageAsync(vm.Translation, settingsExists);
+            vm.TitlebarHeight.Value = Settings.WindowProperties.Fullscreen
+                                           || !Settings.UIProperties.ShowInterface
+                ? 0
+                : SizeDefaults.MainTitlebarHeight;
+            vm.BottombarHeight.Value = Settings.WindowProperties.Fullscreen
+                                                  || !Settings.UIProperties.ShowInterface
+                ? 0
+                : SizeDefaults.BottombarHeight;
+            vm.IsSideBySide.Value = Settings.ImageScaling.ShowImageSideBySide;
+            vm.IsUIShown.Value  = Settings.UIProperties.ShowInterface;
+            vm.IsTopToolbarShown.Value  = Settings.UIProperties.ShowInterface;
+            vm.IsBottomToolbarShown.Value   = Settings.UIProperties.ShowBottomNavBar &&
+                                        Settings.UIProperties.ShowInterface;
+            vm.IsFullscreen.Value  = Settings.WindowProperties.Fullscreen;
+            vm.GlobalSettings.BackgroundChoice.Value = Settings.UIProperties.BgColorChoice;
+        });
     }
     
-    public static void ResetSettings()
+    public static async Task ResetSettings()
     {
-        SetDefaults();
         var core = Application.Current.DataContext as CoreViewModel;
+        if (File.Exists(CurrentSettingsPath))
+        {
+            try
+            {
+                File.Delete(CurrentSettingsPath);
+            }
+            catch (Exception e)
+            {
+                DebugHelper.LogDebug(nameof(SettingsUpdater), nameof(ResetSettings), e);
+                await SetAndSave();
+            }
+        }
+        else
+        {
+            await SetAndSave();
+        }
+
         AppFunctions.Restart(core?.MainWindows.ActiveWindow.Value.WindowTabs.ActiveTab?.Value);
+        
+        return;
+
+        async Task SetAndSave()
+        {
+            SetDefaults();
+            await SaveSettingsAsync();
+        }
     }
     
-    public static async ValueTask ToggleZoomToFit(MainWindowViewModel vm)
+    public static async ValueTask ToggleDockedGalleryInHiddenUI(MainWindowViewModel vm)
+    {
+        var tab = vm.WindowTabs.ActiveTab.CurrentValue;
+        var files = tab.ImageIterator.Files;
+        var gallery = tab.Gallery;
+        if (Settings.Gallery.ShowDockedGalleryInHiddenUI)
+        {
+            Settings.Gallery.ShowDockedGalleryInHiddenUI = false;
+            if (!Settings.UIProperties.ShowInterface)
+            {
+                gallery.ActiveGalleryMode.Value = GalleryMode.Closed;
+            }
+        }
+        else
+        {
+            Settings.Gallery.ShowDockedGalleryInHiddenUI = true;
+            if (!Settings.UIProperties.ShowInterface && Settings.Gallery.IsGalleryDocked)
+            {
+                gallery.ActiveGalleryMode.Value = GalleryMode.Docked;
+            }
+
+            if (gallery.LoadingState is GalleryLoadingState.NotLoaded)
+            {
+                if (Application.Current.DataContext is not CoreViewModel core)
+                {
+                    return;
+                }
+                await GalleryLoader.LoadGalleryAsync(tab, files, ServiceHelper.ThumbLoader, core.SharedThumbnailCache, tab.GetTabCancellation().Token);
+            }
+        }
+
+        await SaveSettingsAsync();
+    }
+    
+    public static async ValueTask ToggleZoomToFit(MainWindowViewModel vm, MainWindow mainWindow)
     {
         if (Settings.ImageScaling.ZoomToFit)
         {
@@ -57,7 +124,12 @@ public static class SettingsUpdater
             vm.IsZoomedToFit.Value = true;
         }
 
-        WindowResizing.SetSize(vm, WindowResizeReason.Layout);
+        WindowResizing.SetSize(mainWindow, WindowResizeReason.Layout);
+
+        var tabViewModel = vm.WindowTabs.ActiveTab.CurrentValue;
+        tabViewModel.ZoomLevel.Value = Convert.ToInt32(tabViewModel.InitialZoom.CurrentValue * 100);;
+        tabViewModel.UpdateTabTitle();
+        
         await SaveSettingsAsync().ConfigureAwait(false);
     }
     
@@ -78,7 +150,7 @@ public static class SettingsUpdater
         {
             var ct = tab.GetTabCancellation();
             await windowTabs.SharedNavigation.RepopulateIterator(tab.FileInfo.CurrentValue, tab, ct).ConfigureAwait(false);
-            await tab.ImageIterator.ReloadAsync(ct).ConfigureAwait(false);
+            await tab.ImageIterator.ReloadAsync().ConfigureAwait(false);
             tab.UpdateTabTitle();
         }
         
@@ -188,23 +260,37 @@ public static class SettingsUpdater
         await SaveSettingsAsync();
     }
     
-    public static async Task ToggleSideBySide()
+    public static async Task ToggleShowFullPathInTitleBar(MainWindowViewModel vm)
+    {
+        if (Settings.UIProperties.ShowFullPathInTitleBar)
+        {
+            Settings.UIProperties.ShowFullPathInTitleBar = false;
+        }
+        else
+        {
+            Settings.UIProperties.ShowFullPathInTitleBar = true;
+        }
+        vm.WindowTabs.ActiveTab.CurrentValue.UpdateTabTitle();
+        await SaveSettingsAsync();
+    }
+    
+    public static async Task ToggleSideBySide(MainWindow mainWindow)
     {
         if (Application.Current.DataContext is not CoreViewModel core)
         {
             return;
         }
-        var window = core.MainWindows.ActiveWindow.Value;
-        var tab = window.WindowTabs.ActiveTab.Value;
+        var vm = core.MainWindows.ActiveWindow.Value;
+        var tab = vm.WindowTabs.ActiveTab.Value;
         
         var showSideBySide = !Settings.ImageScaling.ShowImageSideBySide;
         if (showSideBySide)
         {
             Settings.ImageScaling.ShowImageSideBySide = true;
-            window.IsSideBySide.Value = true;
+            vm.IsSideBySide.Value = true;
             if (tab.CurrentView.CurrentValue is ImageViewer imageViewer)
             {
-                await tab.ImageIterator.ReloadAsync(tab.GetTabCancellation()).ConfigureAwait(false);
+                await tab.ImageIterator.ReloadAsync(false).ConfigureAwait(false);
                 var imageModel = await core.SharedCache.LoadAsync(tab.Id, tab.ImageIterator.SecondaryCurrentIndex, tab.ImageIterator.Files);
                 imageViewer.SecondaryImage.Source = imageModel.Image;
             }
@@ -212,19 +298,19 @@ public static class SettingsUpdater
         else
         {
             Settings.ImageScaling.ShowImageSideBySide = false;
-            window.IsSideBySide.Value = false;
+            vm.IsSideBySide.Value = false;
             if (tab.CurrentView.CurrentValue is ImageViewer imageViewer)
             {
                 imageViewer.SecondaryImage.Source = null;
             }
         }
         
-        WindowResizing.SetSize(window, WindowResizeReason.Application);
-
+        WindowResizing.SetSize(mainWindow, WindowResizeReason.Application);
+        tab.UpdateTabTitle();
         await SaveSettingsAsync();
     }
     
-    public static async Task ToggleScroll(MainWindowViewModel vm)
+    public static async Task ToggleScroll(MainWindowViewModel vm, MainWindow mainWindow)
     {
         if (vm is null)
         {
@@ -240,7 +326,7 @@ public static class SettingsUpdater
             TurnOnScroll(vm);
         }
         
-        WindowResizing.SetSize(vm, WindowResizeReason.Application);
+        WindowResizing.SetSize(mainWindow, WindowResizeReason.Application);
         
         await SaveSettingsAsync();
     }
@@ -266,17 +352,7 @@ public static class SettingsUpdater
             ? TranslationManager.Translation.CtrlToZoom
             : TranslationManager.Translation.ScrollToZoom;
         
-        // Set source for ChangeCtrlZoomImage
-        if (!Application.Current.TryGetResource("ScanEyeImage", Application.Current.RequestedThemeVariant, out var scanEyeImage ))
-        {
-            return;
-        }
-        if (!Application.Current.TryGetResource("LeftRightArrowsImage", Application.Current.RequestedThemeVariant, out var leftRightArrowsImage ))
-        {
-            return;
-        }
-        var isNavigatingWithCtrl = Settings.Zoom.CtrlZoom;
-        vm.ChangeCtrlZoomImage.Value = isNavigatingWithCtrl ? leftRightArrowsImage as DrawingImage : scanEyeImage as DrawingImage;
+        UIHelper.SetCtrlToZoomImage(vm);
         await SaveSettingsAsync().ConfigureAwait(false);
     }
     

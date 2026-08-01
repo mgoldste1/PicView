@@ -6,6 +6,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Styling;
 using Avalonia.Threading;
+using PicView.Avalonia.CustomControls;
 using PicView.Avalonia.UI;
 
 namespace PicView.Avalonia.Animations;
@@ -161,7 +162,7 @@ public static class AnimationsHelper
     /// Displays a brief animation to indicate a clipboard operation occurred.
     /// Fades a semi-transparent rectangle in and out to provide visual feedback.
     /// </summary>
-    public static async Task CopyAnimation()
+    public static async Task CopyAnimation(MainWindow mainWindow)
     {
         const double speed = 0.2;
         const double opacity = 0.4;
@@ -173,20 +174,20 @@ public static class AnimationsHelper
         {
             rectangle = new Rectangle
             {
-                Width = UIHelper.GetMainView.Width,
-                Height = UIHelper.GetMainView.Height,
+                Width = mainWindow.UIHelper.GetMainView.Width,
+                Height = mainWindow.UIHelper.GetMainView.Height,
                 Opacity = 0,
                 Fill = Brushes.Black,
                 IsHitTestVisible = false
             };
-            UIHelper.GetMainView.MainPanel.Children.Add(rectangle);
+            mainWindow.UIHelper.GetMainView.MainPanel.Children.Add(rectangle);
         });
 
         await startOpacityAnimation.RunAsync(rectangle);
         await endOpacityAnimation.RunAsync(rectangle);
         await Task.Delay(200);
 
-        await Dispatcher.UIThread.InvokeAsync(() => { UIHelper.GetMainView.MainPanel.Children.Remove(rectangle); });
+        await Dispatcher.UIThread.InvokeAsync(() => { mainWindow.UIHelper.GetMainView.MainPanel.Children.Remove(rectangle); });
     }
 
     /// <summary>

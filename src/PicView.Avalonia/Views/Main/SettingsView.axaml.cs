@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -12,12 +13,19 @@ public partial class SettingsView : UserControl
     public SettingsView()
     {
         InitializeComponent();
+        
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
     }
 
     private void OnLoaded(object? sender, RoutedEventArgs e)
     {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            FileAssociationsListBoxItem.IsVisible = FileAssociationsListBoxItem.IsVisible = false;
+            FileAssociationsSection.IsVisible = false;
+        }
+        
         _controller = new SettingsSearchController(this);
         _controller.Initialize();
 
@@ -40,9 +48,6 @@ public partial class SettingsView : UserControl
         GeneralSection.RecyclingToggleButton.Classes.Remove("altHover");
         GeneralSection.RecyclingToggleButton.Classes.Add("hover");
         
-        GeneralSection.SubdirectoriesToggleButton.Classes.Remove("altHover");
-        GeneralSection.SubdirectoriesToggleButton.Classes.Add("hover");
-        
         GeneralSection.FileHistoryToggleButton.Classes.Remove("altHover");
         GeneralSection.FileHistoryToggleButton.Classes.Add("hover");
         
@@ -63,9 +68,6 @@ public partial class SettingsView : UserControl
                 
         InterfaceSection.ToggleHoverButton.Classes.Remove("altHover");
         InterfaceSection.ToggleHoverButton.Classes.Add("hover");
-        
-        ImageSection.ZoomToFitToggleButton.Classes.Remove("altHover");
-        ImageSection.ZoomToFitToggleButton.Classes.Add("hover");
         
         ImageSection.ScrollToggleButton.Classes.Remove("altHover");
         ImageSection.ScrollToggleButton.Classes.Add("hover");
@@ -100,8 +102,8 @@ public partial class SettingsView : UserControl
         GallerySection.ShowRightDockedGalleryButton.Classes.Remove("altHover");
         GallerySection.ShowRightDockedGalleryButton.Classes.Add("hover");
         
-        GallerySection.CloseDockedGalleryButton.Classes.Remove("altHover");
-        GallerySection.CloseDockedGalleryButton.Classes.Add("hover");
+        GallerySection.ToggleDockedGalleryButton.Classes.Remove("altHover");
+        GallerySection.ToggleDockedGalleryButton.Classes.Add("hover");
         
         GallerySection.UIHiddenDockedGalleryToggleButton.Classes.Remove("altHover");
         GallerySection.UIHiddenDockedGalleryToggleButton.Classes.Add("hover");
@@ -115,6 +117,9 @@ public partial class SettingsView : UserControl
         NavigationSection.IncludeSubdirToggleButton.Classes.Remove("altHover");
         NavigationSection.IncludeSubdirToggleButton.Classes.Add("hover");      
         
+        ZoomSection.ZoomToFitToggleButton.Classes.Remove("altHover");
+        ZoomSection.ZoomToFitToggleButton.Classes.Add("hover");
+        
         ZoomSection.ResetZoomToggleButton.Classes.Remove("altHover");
         ZoomSection.ResetZoomToggleButton.Classes.Add("hover");
         
@@ -126,6 +131,9 @@ public partial class SettingsView : UserControl
         
         ZoomSection.ShowZoomPercentageToggleButton.Classes.Remove("altHover");
         ZoomSection.ShowZoomPercentageToggleButton.Classes.Add("hover");
+        
+        ZoomSection.ShowZoomPreviewerToggleButton.Classes.Remove("altHover");
+        ZoomSection.ShowZoomPreviewerToggleButton.Classes.Add("hover");
         
         MouseSection.TouchPadButton.Classes.Remove("altHover");
         MouseSection.TouchPadButton.Classes.Add("hover");
@@ -149,6 +157,15 @@ public partial class SettingsView : UserControl
     {
         _controller?.ResetFilters();
         _controller?.ClosePopup();
+
+        if (!e.Properties.IsRightButtonPressed)
+        {
+            return;
+        }
+        if (Resources.TryGetValue("SettingsContextMenu", out var value) && value is ContextMenu contextMenu)
+        {
+            contextMenu.Open();
+        }
     }
 
     private void OnKeyDown(object? sender, KeyEventArgs e)
@@ -159,5 +176,17 @@ public partial class SettingsView : UserControl
     private void OnScrollChanged(object? sender, ScrollChangedEventArgs e)
     {
         _controller?.HandleScrollChanged(ContentScrollViewer.Offset.Y, ContentPanel.Spacing * 2);
+    }
+
+    private void CloseItem_OnClick(object? sender, RoutedEventArgs e)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            if (TopLevel.GetTopLevel(this) is not Window window)
+            {
+                return;
+            }
+            window.Close();
+        });
     }
 }

@@ -1,5 +1,6 @@
 ﻿using Avalonia;
 using Avalonia.Threading;
+using PicView.Avalonia.CustomControls;
 using PicView.Avalonia.UI;
 using PicView.Avalonia.Views.UC.PopUps;
 using PicView.Core.DebugTools;
@@ -17,8 +18,9 @@ public static class FileManager
     /// <param name="recycle">A flag indicating whether to recycle the file (if true) or delete it permanently (if false).</param>
     /// <param name="path">The fully qualified path to the file to be deleted.</param>
     /// <param name="platformService">The platform-specific service responsible for performing the file deletion operation.</param>
+    /// <param name="mainWindow">The main window of the application.</param>
     public static async ValueTask DeleteFileWithOptionalDialog(bool recycle, string path,
-        IPlatformSpecificService platformService)
+        IPlatformSpecificService platformService, MainWindow mainWindow)
     {
         if (string.IsNullOrWhiteSpace(path))
         {
@@ -62,7 +64,7 @@ public static class FileManager
                 ? TranslationManager.Translation.DeleteFile
                 : TranslationManager.Translation.DeleteFilePermanently;
             var deleteDialog = new DeleteDialog(prompt, path, recycle);
-            UIHelper.GetMainView.MainPanel.Children.Add(deleteDialog);
+            mainWindow.UIHelper.GetMainView.MainPanel.Children.Add(deleteDialog);
             // Dialog handles the deletion
         }
     }

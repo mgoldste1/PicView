@@ -5,6 +5,7 @@ using Avalonia.Threading;
 using ImageMagick;
 using PicView.Avalonia.Animations;
 using PicView.Avalonia.Clipboard;
+using PicView.Avalonia.CustomControls;
 using PicView.Avalonia.FileSystem;
 using PicView.Avalonia.ImageHandling;
 using PicView.Avalonia.Views.UC;
@@ -17,7 +18,7 @@ using R3;
 
 namespace PicView.Avalonia.Crop;
 
-public class CropService(TabViewModel tabViewModel) : ICropService
+public class CropService(TabViewModel tabViewModel, MainWindow mainWindow) : ICropService
 {
     public bool IsCropping { get; private set; }
     
@@ -25,9 +26,9 @@ public class CropService(TabViewModel tabViewModel) : ICropService
     private bool _couldNavigateBackwards;
     private bool _couldNavigateForwards;
 
-    public async Task StartCropControlAsync(MainWindowViewModel vm)
+    public async Task StartCropControlAsync()
     {
-        if (!CropManager.SetIfCropEnabled(vm))
+        if (!CropManager.SetIfCropEnabled(mainWindow) || mainWindow.DataContext is not MainWindowViewModel vm)
         {
             return;
         }
@@ -39,7 +40,7 @@ public class CropService(TabViewModel tabViewModel) : ICropService
         {
             // Reset setting before resizing
             Settings.Gallery.IsGalleryDocked = false;
-            WindowResizing.SetSize(vm, WindowResizeReason.Application);
+            WindowResizing.SetSize(mainWindow, WindowResizeReason.Application);
         }
         
         var size = new Size(vm.ImageWidth.CurrentValue, vm.ImageHeight.CurrentValue);
@@ -100,7 +101,8 @@ public class CropService(TabViewModel tabViewModel) : ICropService
     {
         if (GetCroppedImage() is Bitmap bitmap)
         {
-            await Task.WhenAll(ClipboardImageOperations.CopyImageToClipboard(bitmap), AnimationsHelper.CopyAnimation());
+            await Task.WhenAll(ClipboardImageOperations.CopyImageToClipboard(bitmap),
+                AnimationsHelper.CopyAnimation(mainWindow));
         }
     }
 
@@ -121,16 +123,9 @@ public class CropService(TabViewModel tabViewModel) : ICropService
 
     public void CloseCropControl()
     {
-        if (Application.Current.DataContext is not CoreViewModel core)
-        {
-            return;
-        }
-
-        var vm = core.MainWindows.ActiveWindow.CurrentValue;
-
         if (Settings.Gallery.IsGalleryDocked)
         {
-            WindowResizing.SetSize(vm, WindowResizeReason.Application);
+            WindowResizing.SetSize(mainWindow, WindowResizeReason.Application);
         }
         
         tabViewModel.CurrentView.Value = _backUpView;
@@ -164,7 +159,7 @@ public class CropService(TabViewModel tabViewModel) : ICropService
 
         if (tabViewModel.FileInfo.Value.FullName == saveFileDialog)
         {
-            await tabViewModel.ImageIterator.ReloadAsync(tabViewModel.GetTabCancellation());
+            await tabViewModel.ImageIterator.ReloadAsync();
         }
     }
 

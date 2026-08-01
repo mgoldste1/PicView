@@ -12,9 +12,7 @@ namespace PicView.Core.FileAssociations;
 [JsonSerializable(typeof(AssociationItem))]
 [JsonSerializable(typeof(List<AssociationItem>))]
 [JsonSerializable(typeof(List<string>))]
-internal partial class FileAssociationSourceGenerationContext : JsonSerializerContext
-{
-}
+internal partial class FileAssociationSourceGenerationContext : JsonSerializerContext;
 
 /// <summary>
 /// Processes file associations through temporary files to handle large sets of associations.
@@ -30,6 +28,7 @@ public static class FileAssociationProcessor
     public static async Task<bool> SetFileAssociations(List<FileTypeGroup> groups)
     {
         try
+        
         {
             // If we're on Windows, check for admin permissions
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) && !IsAdministrator())

@@ -1,4 +1,3 @@
-using PicView.Core.Config;
 using PicView.Core.Models;
 using PicView.Core.Navigation;
 using PicView.Core.Navigation.Interfaces;
@@ -20,7 +19,7 @@ public class FileWatcherServiceTests : IDisposable
         ObservableSystem.DefaultFrameProvider = new MockFrameProvider();
 
         // Ensure Settings are initialized for FileWatcherService usage
-        SettingsManager.SetDefaults();
+        SetDefaults();
 
         _testDirectory = Path.Combine(Path.GetTempPath(), "PicViewTests_" + Guid.NewGuid());
         Directory.CreateDirectory(_testDirectory);
@@ -149,6 +148,10 @@ public class FileWatcherServiceTests : IDisposable
     {
         public bool Resynchronized { get; private set; }
         public void Resynchronize(uint ownerId, IReadOnlyList<FileInfo> files) => Resynchronized = true;
+        public ValueTask<bool> WaitForLoadingCompleteAsync(uint ownerId, int index, IReadOnlyList<FileInfo> list, CancellationToken ct = default)
+        {
+            throw new NotImplementedException();
+        }
 
         // Stub other methods
         public Task<ImageModel?> LoadAsync(uint ownerId, int index, IReadOnlyList<FileInfo> list, CancellationToken ct = default) => Task.FromResult<ImageModel?>(null);
@@ -160,10 +163,14 @@ public class FileWatcherServiceTests : IDisposable
         public void Clear() { }
         public void Clear(uint ownerId) { }
         public bool Contains(PreLoadValue value) => false;
-        public bool Add(uint ownerId, int index, PreLoadValue preLoadValue, int listCount, bool isReverse) => false;
+        public void Add(uint ownerId, int index, PreLoadValue preLoadValue, int listCount, bool isReverse)
+        {
+            
+        }
+
         public bool TryAdd(uint ownerId, int index, PreLoadValue preLoadValue, int listCount, bool isReverse, out PreLoadValue? value) { value = null; return false; }
         public void Preload(uint ownerId, int currentIndex, bool reversed, IReadOnlyList<FileInfo> files, CancellationToken token) { }
-        public void Clear(TabViewModel tab, int currentIndex, string directory, IReadOnlyList<FileInfo> files) { }
+        public void Clear(TabViewModel tab, string directory) { }
         public void TryRemove(uint ownerId, int index) { }
         public void EvictPath(string fullPath) { }
         public ValueTask<bool> WaitForLoadingCompleteAsync(uint ownerId, int index) => ValueTask.FromResult(false);

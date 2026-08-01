@@ -10,7 +10,8 @@ using MainWindowViewModel = PicView.Core.ViewModels.MainWindowViewModel;
 
 namespace PicView.Avalonia.ImageTransformations;
 
-public class RotationTransformer(LayoutTransformControl imageLayoutTransformControl, PicBox mainImage, MainWindowViewModel vm)
+public class RotationTransformer(LayoutTransformControl imageLayoutTransformControl, PicBox mainImage,
+    MainWindowViewModel vm, MainWindow mainWindow)
 {
     public void Rotate(bool clockWise)
     {
@@ -42,7 +43,7 @@ public class RotationTransformer(LayoutTransformControl imageLayoutTransformCont
         var tab = vm.WindowTabs.ActiveTab.Value;
         tab.RotationAngle.Value = angle;
         
-        WindowResizing.SetSize(vm, WindowResizeReason.Layout);
+        WindowResizing.SetSize(mainWindow, WindowResizeReason.Layout);
 
         if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX) && Settings.WindowProperties.Fullscreen)
         {

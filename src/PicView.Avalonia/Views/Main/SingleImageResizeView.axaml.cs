@@ -1,5 +1,6 @@
 ﻿using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Media;
 using PicView.Avalonia.FileSystem;
 using PicView.Avalonia.UI;
@@ -35,6 +36,8 @@ public partial class SingleImageResizeView : UserControl
         vm.PickFileAction = SafePickAsync;
 
         RegisterEventHandlers(mainVm);
+
+        vm.ShowReset.Value = false;
     }
 
     private void SafeClose()
@@ -62,6 +65,9 @@ public partial class SingleImageResizeView : UserControl
 
         mainVm.ResizeImageViewModel?.Dispose();
         mainVm.ResizeImageViewModel = null;
+        
+        PixelWidthTextBox.KeyDown -= TextBoxOnKeyDown;
+        PixelHeightTextBox.KeyDown -= TextBoxOnKeyDown;
     }
 
     private void ApplyThemeAdjustments()
@@ -71,29 +77,30 @@ public partial class SingleImageResizeView : UserControl
             BgPanel.Background = Brushes.Transparent;
         }
 
-        if (!Settings.Theme.Dark)
+        if (Settings.Theme.Dark)
         {
-            var topBg = new SolidColorBrush(Color.FromArgb(65, 162, 162, 162));
-            var bottomBg = new SolidColorBrush(Color.FromArgb(93, 162, 162, 162));
-            MainBorder.Background = topBg;
-            BottomBorder.Background = bottomBg;
-
-            var noThickness = new Thickness(0);
-            PixelWidthTextBox.BorderThickness = noThickness;
-            PixelHeightTextBox.BorderThickness = noThickness;
-
-            if (TryGetResource("CancelBrush", Application.Current.RequestedThemeVariant, out var cBrush) && cBrush is SolidColorBrush brush)
-            {
-                UIHelper.SetButtonHover(CancelButton, brush);
-            }
-            UIHelper.SwitchAccentHoverClass(CancelButton);
+            return;
         }
+
+        var topBg = new SolidColorBrush(Color.FromArgb(65, 162, 162, 162));
+        var bottomBg = new SolidColorBrush(Color.FromArgb(93, 162, 162, 162));
+        MainBorder.Background = topBg;
+        BottomBorder.Background = bottomBg;
+
+        var noThickness = new Thickness(0);
+        PixelWidthTextBox.BorderThickness = noThickness;
+        PixelHeightTextBox.BorderThickness = noThickness;
+
+        if (TryGetResource("CancelBrush", Application.Current.RequestedThemeVariant, out var cBrush) && cBrush is SolidColorBrush brush)
+        {
+            UIHelper.SetButtonHover(CancelButton, brush);
+        }
+        UIHelper.SwitchAccentHoverClass(CancelButton);
     }
 
     private void RegisterEventHandlers(MainWindowViewModel mainVm)
     {
         var vm = mainVm.ResizeImageViewModel!;
-        var tab = mainVm.WindowTabs.ActiveTab.CurrentValue;
 
         // VM -> UI sync
         vm.IsLoading.Subscribe(SetLoadingState).AddTo(ref _disposables);
@@ -105,6 +112,19 @@ public partial class SingleImageResizeView : UserControl
         ResetButton.Click += (_, _) => vm.ResetSettings();
         CancelButton.Click += (_, _) => vm.CloseAction?.Invoke();
         LinkChainButton.Click += (_, _) => vm.ToggleAspectRatio();
+        
+        PixelWidthTextBox.KeyDown += TextBoxOnKeyDown;
+        PixelHeightTextBox.KeyDown += TextBoxOnKeyDown;
+    }
+
+    private void TextBoxOnKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key is not Key.Enter || DataContext is not MainWindowViewModel mainVm)
+        {
+            return;
+        }
+        var vm = mainVm.ResizeImageViewModel;
+        _ = vm.SaveImage();
     }
 
     private void SetLoadingState(bool isLoading)

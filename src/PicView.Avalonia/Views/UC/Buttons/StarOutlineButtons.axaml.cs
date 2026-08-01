@@ -4,7 +4,6 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.LogicalTree;
 using Avalonia.Media;
-using PicView.Avalonia.UI;
 using PicView.Core.ViewModels;
 using R3;
 
@@ -48,7 +47,7 @@ public partial class StarOutlineButtons : UserControl
             return;
         }
 
-        _disposable = Observable.EveryValueChanged(vm.Exif, x => x.ExifRating.Value, UIHelper.GetFrameProvider)
+        _disposable = Observable.EveryValueChanged(vm.Exif, x => x.ExifRating.Value)
             .Subscribe(SetStars);
     }
 

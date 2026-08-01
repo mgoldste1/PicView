@@ -1,0 +1,291 @@
+<Window
+    x:Class="PicView.Avalonia.Win32.Views.FileAssociationWindow"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:customControls="clr-namespace:PicView.Avalonia.CustomControls;assembly=PicView.Avalonia"
+    xmlns:uc="clr-namespace:PicView.Avalonia.Views.UC;assembly=PicView.Avalonia"
+    xmlns:viewModels="clr-namespace:PicView.Core.ViewModels;assembly=PicView.Core"
+    Title="Loading..."
+    x:DataType="viewModels:CoreViewModel"
+    BorderThickness="1"
+    CanResize="False"
+    CornerRadius="8"
+    SizeToContent="WidthAndHeight">
+
+    <Border
+        x:Name="ParentBorder"
+        BorderBrush="{DynamicResource WindowBorderColor}"
+        BorderThickness="1">
+        <StackPanel>
+
+            <DockPanel
+                Height="28"
+                LastChildFill="True"
+                PointerPressed="MoveWindow">
+
+                <Border
+                    x:Name="IconBorder"
+                    Background="{DynamicResource WindowButtonBackgroundColor}"
+                    BorderBrush="{DynamicResource MainBorderColor}"
+                    BorderThickness="0,0,1,0"
+                    DockPanel.Dock="Left">
+                    <Image
+                        Width="20"
+                        Height="25"
+                        Margin="7,1,7,1"
+                        Source="{StaticResource LogoImage}" />
+                </Border>
+
+                <customControls:IconButton
+                    x:Name="CloseButton"
+                    Width="30"
+                    Background="{DynamicResource WindowButtonBackgroundColor}"
+                    BorderThickness="0"
+                    Classes="hover"
+                    Click="Close"
+                    ClickMode="Release"
+                    Data="{StaticResource CloseGeometry}"
+                    DockPanel.Dock="Right"
+                    Foreground="{DynamicResource MainTextColor}"
+                    IconHeight="10"
+                    IconWidth="10"
+                    IsRepeatEnabled="False" />
+
+                <customControls:IconButton
+                    x:Name="MinimizeButton"
+                    Width="30"
+                    Background="{DynamicResource WindowButtonBackgroundColor}"
+                    BorderBrush="{DynamicResource MainBorderColor}"
+                    BorderThickness="1,0,1,0"
+                    Classes="hover"
+                    Click="Minimize"
+                    Data="{StaticResource MinimizeGeometry}"
+                    DockPanel.Dock="Right"
+                    Foreground="{DynamicResource MainTextColor}"
+                    IconHeight="12"
+                    IconWidth="12"
+                    IsRepeatEnabled="False" />
+
+                <TextBlock
+                    x:Name="TitleText"
+                    Height="28"
+                    Padding="30,0,0,0"
+                    Background="{DynamicResource WindowSecondaryBackgroundColor}"
+                    Classes="txt"
+                    Foreground="{DynamicResource MainTextColor}"
+                    LineHeight="28"
+                    Text="{CompiledBinding Translation.FileAssociations.Value,
+                                           Mode=OneWay}"
+                    TextAlignment="Center" />
+            </DockPanel>
+
+            <Rectangle
+                x:Name="BorderRectangle"
+                Height="1"
+                Fill="{DynamicResource WindowBorderColor}" />
+
+            <Panel>
+
+                <uc:SpinWaiter
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    IsVisible="{CompiledBinding AssociationsViewModel.IsProcessing.Value,
+                                                Mode=OneWay}" />
+
+                <DockPanel
+                    HorizontalAlignment="Center"
+                    Focusable="True"
+                    IsHitTestVisible="{CompiledBinding !AssociationsViewModel.IsProcessing.Value,
+                                                       Mode=OneWay}"
+                    LastChildFill="True"
+                    Opacity="{CompiledBinding AssociationsViewModel.Opacity.Value,
+                                              Mode=OneWay}">
+
+                    <TextBlock
+                        Margin="10,20,10,0"
+                        Classes="txt"
+                        DockPanel.Dock="Top"
+                        FontFamily="avares://PicView.Avalonia/Assets/Fonts/Roboto-Bold.ttf#Roboto"
+                        FontSize="14"
+                        Text="{CompiledBinding Translation.FileAssociations.Value,
+                                               Mode=OneWay}" />
+
+                    <TextBlock
+                        Margin="10,01"
+                        Padding="0,5,10,15"
+                        HorizontalAlignment="Left"
+                        Classes="txt"
+                        DockPanel.Dock="Top"
+                        Foreground="{StaticResource SecondaryTextColor}"
+                        Text="{CompiledBinding Translation.SelectFileTypesToAssociate.Value,
+                                               Mode=OneWay}" />
+
+                    <StackPanel
+                        Margin="0,0,0,5"
+                        Background="Transparent"
+                        DockPanel.Dock="Top"
+                        Orientation="Horizontal">
+
+                        <Panel>
+
+                            <Image
+                                Width="14"
+                                Height="14"
+                                Margin="10,0,0,0"
+                                HorizontalAlignment="Left"
+                                Source="{StaticResource SearchImage}" />
+
+                            <TextBox
+                                x:Name="FilterBox"
+                                Width="269"
+                                Padding="30,7,4,6"
+                                HorizontalAlignment="Left"
+                                Background="Transparent"
+                                BorderBrush="Transparent"
+                                BorderThickness="1"
+                                FontFamily="avares://PicView.Avalonia/Assets/Fonts/Roboto-Regular.ttf#Roboto"
+                                Foreground="{DynamicResource MainTextColor}"
+                                Text="{CompiledBinding AssociationsViewModel.FilterText.Value,
+                                                       FallbackValue='',
+                                                       Mode=TwoWay}"
+                                Watermark="{CompiledBinding Translation.Filter.Value,
+                                                            Mode=OneWay}" />
+
+                            <customControls:IconButton
+                                x:Name="ClearButton"
+                                Padding="10,3,10,3"
+                                HorizontalAlignment="Right"
+                                Classes="altHover"
+                                Command="{CompiledBinding AssociationsViewModel.ClearFilterCommand}"
+                                Data="{StaticResource CloseGeometry}"
+                                DockPanel.Dock="Right"
+                                Foreground="{DynamicResource MainTextColorFaded}"
+                                IconHeight="12"
+                                IconWidth="12"
+                                IsVisible="{CompiledBinding AssociationsViewModel.FilterText.Value,
+                                                            Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                        </Panel>
+
+                        <Button
+                            Padding="10,2,10,2"
+                            Classes="altHover"
+                            Command="{CompiledBinding AssociationsViewModel.SelectAllCommand}">
+                            <TextBlock
+                                Classes="txt"
+                                Foreground="{StaticResource SecondaryTextColor}"
+                                Text="{CompiledBinding Translation.SelectAll.Value,
+                                                       Mode=OneWay}" />
+                        </Button>
+
+                        <Rectangle
+                            Width="2"
+                            Height="16"
+                            Margin="5,0,5,0"
+                            Fill="{DynamicResource TertiaryBorderColor}" />
+
+                        <Button
+                            x:Name="UnSelectAllButton"
+                            Padding="10,2,10,2"
+                            Classes="altHover"
+                            Command="{CompiledBinding AssociationsViewModel.UnselectAllCommand}">
+                            <TextBlock
+                                Classes="txt"
+                                Foreground="{StaticResource SecondaryTextColor}"
+                                Text="{CompiledBinding Translation.UnselectAll.Value,
+                                                       Mode=OneWay}" />
+                        </Button>
+                    </StackPanel>
+
+
+                    <customControls:AutoScrollViewer
+                        x:Name="FileTypesScrollViewer"
+                        Height="520"
+                        Background="Transparent"
+                        DockPanel.Dock="Top">
+                        <StackPanel x:Name="FileTypesContainer" Margin="10,0">
+                            <StackPanel.Styles>
+                                <Style Selector="CheckBox.x">
+                                    <Setter Property="Margin" Value="15,0,0,5" />
+                                    <Setter Property="Background" Value="Transparent" />
+                                </Style>
+                                <Style Selector="CheckBox.y">
+                                    <Setter Property="Margin" Value="0,10,0,10" />
+                                    <Setter Property="Background" Value="Transparent" />
+                                </Style>
+                            </StackPanel.Styles>
+
+                        </StackPanel>
+                    </customControls:AutoScrollViewer>
+
+                    <DockPanel Margin="0,15,0,0">
+
+                        <Button
+                            Padding="20,10"
+                            HorizontalAlignment="Left"
+                            Background="Transparent"
+                            Classes="altHover mainBtn"
+                            Command="{CompiledBinding AssociationsViewModel.ResetCommand}"
+                            CornerRadius="3"
+                            DockPanel.Dock="Left">
+                            <TextBlock
+                                Classes="txt"
+                                Foreground="{StaticResource SecondaryTextColor}"
+                                Text="{CompiledBinding Translation.Reset.Value,
+                                                       Mode=OneWay}" />
+                        </Button>
+
+                        <Button
+                            Padding="20,10"
+                            HorizontalAlignment="Right"
+                            Background="{DynamicResource AccentColor}"
+                            BorderThickness="0"
+                            Classes="BorderStyle accentHover mainBtn"
+                            Command="{CompiledBinding AssociationsViewModel.ApplyCommand}"
+                            CornerRadius="3"
+                            DockPanel.Dock="Right">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock
+                                    Margin="10,0,0,0"
+                                    Classes="txt"
+                                    Foreground="{StaticResource SecondaryTextColor}"
+                                    Text="{CompiledBinding Translation.Apply.Value,
+                                                           Mode=OneWay}" />
+                                <Image
+                                    Width="18"
+                                    Height="18"
+                                    Margin="10,0,0,0"
+                                    Source="{StaticResource UserShieldImage}" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button
+                            x:Name="UnassociateButton"
+                            Padding="5,0"
+                            HorizontalAlignment="Right"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Classes="errorHover mainBtn"
+                            Command="{CompiledBinding AssociationsViewModel.UnassociateCommand}"
+                            CornerRadius="3"
+                            DockPanel.Dock="Right">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock
+                                    Margin="10,0,0,0"
+                                    Classes="txt"
+                                    Foreground="{StaticResource SecondaryTextColor}"
+                                    Text="{CompiledBinding Translation.Unassociate.Value,
+                                                           Mode=OneWay}" />
+                                <Image
+                                    Width="18"
+                                    Height="18"
+                                    Margin="10,0,10,0"
+                                    Source="{StaticResource UserShieldImage}" />
+                            </StackPanel>
+                        </Button>
+
+                    </DockPanel>
+                </DockPanel>
+            </Panel>
+        </StackPanel>
+    </Border>
+</Window>

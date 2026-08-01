@@ -57,12 +57,15 @@ public interface IFunctionsMapper
     ValueTask ToggleConstrainBackgroundColor();
     ValueTask ChangeBackground();
     ValueTask ToggleDropDownMenu();
+    ValueTask ToggleFileHistory();
+    ValueTask ToggleShowFullPathInTitleBar();
     
     // Gallery
     ValueTask ToggleGallery();
     ValueTask OpenCloseDockedGallery();
     ValueTask CloseGallery();
     ValueTask GalleryClick();
+    ValueTask ToggleDockedGalleryInHiddenUI();
 
     // Open Windows/Dialogs
     ValueTask AboutWindow();
@@ -73,6 +76,7 @@ public interface IFunctionsMapper
     ValueTask ImageInfoWindow();
     ValueTask ResizeWindow();
     ValueTask BatchResizeWindow();
+    ValueTask FileAssociationsWindow();
     ValueTask SettingsWindow();
     
     // Windows operations
@@ -137,9 +141,6 @@ public interface IFunctionsMapper
     ValueTask SortFilesRandomly();
     ValueTask SortFilesAscending();
     ValueTask SortFilesDescending();
-    
-    // File History
-    ValueTask ToggleFileHistory();
 
     // Ratings
     ValueTask Set0Star();

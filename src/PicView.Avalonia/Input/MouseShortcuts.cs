@@ -5,7 +5,6 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Threading;
 using PicView.Avalonia.CustomControls;
-using PicView.Avalonia.UI;
 using PicView.Avalonia.Views.UC;
 using PicView.Core.Navigation;
 using PicView.Core.ViewModels;
@@ -17,6 +16,7 @@ public static class MouseShortcuts
     public static async ValueTask HandlePointerWheelChanged(
         PointerWheelEventArgs e,
         MainWindowViewModel mainViewModel,
+        MainWindow mainWindow,
         AutoScrollViewer imageScrollViewer,
         Func<PointerWheelEventArgs, ValueTask>? zoomIn,
         Func<PointerWheelEventArgs, ValueTask>? zoomOut)
@@ -24,7 +24,7 @@ public static class MouseShortcuts
         // Don't handle mouse wheel if the view is not the image viewer
         // or a dialog is opened
         var shouldReturn = await Dispatcher.UIThread.InvokeAsync(() =>
-            mainViewModel.WindowTabs.ActiveTab.Value.CurrentView.Value is not ImageViewer || DialogManager.IsDialogOpen);
+            mainViewModel.WindowTabs.ActiveTab.Value.CurrentView.Value is not ImageViewer || mainWindow.IsDialogOpen);
         if (shouldReturn)
         {
             return;
@@ -241,8 +241,10 @@ public static class MouseShortcuts
                     return;
             }
         }
-        // Handle double click
-        if (e.ClickCount is 2)
+        // Handle double click (only for the left mouse button, so that rapid
+        // double-clicks of the side buttons don't fall through and trigger the
+        // left-button double-click behavior such as toggling fullscreen)
+        if (e.ClickCount is 2 && prop.IsLeftButtonPressed)
         {
             switch (Settings.UIProperties.DoubleClickBehavior)
             {

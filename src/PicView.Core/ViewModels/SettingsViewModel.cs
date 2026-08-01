@@ -105,6 +105,12 @@ public class SettingsViewModel : IDisposable
                 Settings.Labeling.RelabelPolicy = (RelabelPolicy)x;
                 await SaveSettingsAsync();
             }, DebugHelper.LogError(nameof(SettingsViewModel), nameof(RelabelPolicyIndex))).AddTo(ref _disposables);
+        Observable.EveryValueChanged(this, x => x.SameLabelPolicyIndex.CurrentValue)
+            .SubscribeAwait(async (x, _) =>
+            {
+                Settings.Labeling.SameLabelPolicy = (SameLabelPolicy)x;
+                await SaveSettingsAsync();
+            }, DebugHelper.LogError(nameof(SettingsViewModel), nameof(SameLabelPolicyIndex))).AddTo(ref _disposables);
         Observable.EveryValueChanged(this, x => x.LabelModeIndex.CurrentValue)
             .SubscribeAwait(async (x, _) =>
             {
@@ -251,6 +257,7 @@ public class SettingsViewModel : IDisposable
     public BindableReactiveProperty<bool> IsIncludingSubdirectories { get; } = new(Settings.Sorting.IncludeSubDirectories);
     public BindableReactiveProperty<bool> IsShowingTaskbarProgress { get; } = new(Settings.UIProperties.IsTaskbarProgressEnabled);
     public BindableReactiveProperty<bool> IsFileHistoryEnabled { get; } = new(Settings.Navigation.IsFileHistoryEnabled);
+    public BindableReactiveProperty<bool> IsShowingFullPathInTitleBar { get; } = new(Settings.UIProperties.ShowFullPathInTitleBar);
 
     // Labeling
     public BindableReactiveProperty<bool> IsAutoAdvancingAfterLabel { get; } =
@@ -261,6 +268,9 @@ public class SettingsViewModel : IDisposable
 
     public BindableReactiveProperty<int> RelabelPolicyIndex { get; } =
         new((int)(Settings.Labeling ?? new LabelSettings()).RelabelPolicy);
+
+    public BindableReactiveProperty<int> SameLabelPolicyIndex { get; } =
+        new((int)(Settings.Labeling ?? new LabelSettings()).SameLabelPolicy);
 
     public BindableReactiveProperty<int> LabelModeIndex { get; } =
         new((int)(Settings.Labeling ?? new LabelSettings()).Mode);

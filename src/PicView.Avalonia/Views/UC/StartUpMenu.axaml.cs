@@ -6,8 +6,9 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using PicView.Avalonia.Clipboard;
 using PicView.Avalonia.ColorManagement;
+using PicView.Avalonia.CustomControls;
 using PicView.Avalonia.FileSystem;
-using PicView.Avalonia.UI;
+using PicView.Avalonia.Navigation;
 using PicView.Core.Extensions;
 using PicView.Core.Localization;
 using PicView.Core.Sizing;
@@ -45,25 +46,32 @@ public partial class StartUpMenu : UserControl
         PasteButton.PointerExited += PasteButtonOnPointerExited;
         PasteButton.AddHandler(PointerPressedEvent, PasteClick, RoutingStrategies.Tunnel);
 
+        if (!Settings.Theme.Dark)
+        {
+            Background = new SolidColorBrush(Color.FromArgb(242, 217, 217, 217));
+        }
+
         if (DataContext is not TabViewModel tab)
         {
             return;
         }
 
-        tab.Title.Value = TranslationManager.Translation.NoImage ?? string.Empty;
-        tab.WindowTitle.Value = StringExtensions.CombineWithAppName(TranslationManager.Translation.NoImage);
-        tab.TitleTooltip.Value = TranslationManager.Translation.NoImage ?? string.Empty;
+        var noImage = TranslationManager.Translation.NoImage ?? "No image";
+        tab.Title.Value = noImage;
+        tab.WindowTitle.Value = StringExtensions.CombineWithAppName(noImage);
+        tab.TitleTooltip.Value = noImage;
     }
 
     private async ValueTask PasteClick(object? sender, RoutedEventArgs e)
     {
-        if (Application.Current.DataContext is not CoreViewModel core || DataContext is not TabViewModel tab)
+        if (Application.Current.DataContext is not CoreViewModel core || DataContext is not TabViewModel tab
+            || TopLevel.GetTopLevel(this) is not MainWindow mainWindow)
         {
             return;
         }
 
         tab.CurrentView.Value = new ImageViewer();
-        var isPastedSuccessfully = await ClipboardPasteOperations.Paste(core.MainWindows.ActiveWindow.CurrentValue);
+        var isPastedSuccessfully = await ClipboardPasteOperations.Paste(core.MainWindows.ActiveWindow.CurrentValue, mainWindow);
         if (!isPastedSuccessfully)
         {
             tab.CurrentView.Value = new StartUpMenu();
@@ -72,12 +80,11 @@ public partial class StartUpMenu : UserControl
 
     private void OpenLastFileButtonOnClick(object? sender, RoutedEventArgs e)
     {
-        if (Application.Current.DataContext is not CoreViewModel core)
+        if (Application.Current.DataContext is not CoreViewModel core || TopLevel.GetTopLevel(this) is not MainWindow mainWindow)
         {
             return;
         }
-        
-        _ = UIHelper.OpenLastFile(core.MainWindows.ActiveWindow.CurrentValue).ConfigureAwait(false);
+        _ = UINavigationHelper.OpenLastFile(mainWindow, core.MainWindows.ActiveWindow.CurrentValue).ConfigureAwait(false);
     }
 
     private void PasteButtonOnPointerExited(object? sender, PointerEventArgs e)
@@ -134,14 +141,14 @@ public partial class StartUpMenu : UserControl
         selectFileBrush.Color = ColorManager.PrimaryAccentColor;
     }
 
-    private static void SelectFileButtonOnClick(object? sender, RoutedEventArgs e)
+    private void SelectFileButtonOnClick(object? sender, RoutedEventArgs e)
     {
         // There is problems with DataContext and commands, so just use event
-        if (Application.Current.DataContext is not CoreViewModel core)
+        if (Application.Current.DataContext is not CoreViewModel core || TopLevel.GetTopLevel(this) is not MainWindow mainWindow)
         {
             return;
         }
-        FilePicker.SelectAndLoadFile(core.MainWindows.ActiveWindow.CurrentValue).ConfigureAwait(false);
+        FilePicker.SelectAndLoadFile(mainWindow, core.MainWindows.ActiveWindow.CurrentValue).ConfigureAwait(false);
     }
 
     private void SelectFileButtonOnPointerExited(object? sender, PointerEventArgs e)

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using PicView.Core.ArchiveHandling;
 using PicView.Core.DebugTools;
 using PicView.Core.Extensions;
 using PicView.Core.Localization;
@@ -23,14 +24,14 @@ namespace PicView.Core.ViewModels;
 /// lifecycle of resources specific to this tab instance.
 /// </para>
 /// </summary>
-public class TabViewModel(Action<uint> closeTab, IFileWatcherService? fileWatcherService = null) : IDisposable
+public class TabViewModel(Action<uint> closeTab, MainWindowViewModel parentWindowContext, IFileWatcherService? fileWatcherService = null) : IDisposable
 {
     #region Properties
     
     #region Tab logic
     /// The MainWindowViewModel that currently "owns" this tab
-    public MainWindowViewModel? ParentWindowContext { get; set; }
-    
+    public MainWindowViewModel ParentWindowContext { get; set; } = parentWindowContext;
+
     /// Unique identifier for this tab.
     public uint Id { get; } = TabIDGenerator.GetNextId();
 
@@ -84,6 +85,7 @@ public class TabViewModel(Action<uint> closeTab, IFileWatcherService? fileWatche
     
     /// <inheritdoc cref="Core.Navigation.Interfaces.IImageIterator"/>>
     public IImageIterator? ImageIterator { get; private set; }
+    public ArchiveExtractionService ArchiveExtractionService { get; } = new();
     public IThumbnailCache? ThumbnailCache { get; private set; }
 
     private IFileWatcherService? _fileWatcherService = fileWatcherService;
@@ -92,6 +94,7 @@ public class TabViewModel(Action<uint> closeTab, IFileWatcherService? fileWatche
     public BindableReactiveProperty<int> MaxIndex { get; } = new(0);
     public BindableReactiveProperty<bool> CanNavigateForwards { get; } = new();
     public BindableReactiveProperty<bool> CanNavigateBackwards { get; } = new();
+    public bool IsFileWatcherNavigationEnabled { get; set; } = true;
     
     /// <summary>
     /// Should be used when changing directory or closing the tab
@@ -155,8 +158,16 @@ public class TabViewModel(Action<uint> closeTab, IFileWatcherService? fileWatche
         
         var index = ImageIterator.CurrentIndex;
         var windowTitles = GetTitles();
+        if (Settings.UIProperties.ShowFullPathInTitleBar)
+        {
+            Title.Value = windowTitles.FilePathTitle;
+        }
+        else
+        {
+            Title.Value = windowTitles.BaseTitle;
+        }
         WindowTitle.Value = windowTitles.TitleWithAppName;
-        Title.Value = windowTitles.BaseTitle;
+
         TitleTooltip.Value = windowTitles.FilePathTitle;
         if (Settings.ImageScaling.ShowImageSideBySide && SecondaryModel is not null)
         {
@@ -182,7 +193,8 @@ public class TabViewModel(Action<uint> closeTab, IFileWatcherService? fileWatche
 
             if (Settings.ImageScaling.ShowImageSideBySide && SecondaryModel is not null)
             {
-                var secondInfo = new ImageTitleInfo(SecondaryModel.FileInfo, SecondaryModel.PixelWidth, SecondaryModel.PixelHeight, index + 1, ImageIterator.Files.Count);
+                var secondIndex = ImageIterator.SecondaryCurrentIndex;
+                var secondInfo = new ImageTitleInfo(SecondaryModel.FileInfo, SecondaryModel.PixelWidth, SecondaryModel.PixelHeight, secondIndex, ImageIterator.Files.Count);
                 return ImageTitleFormatter.GenerateTitleForSideBySide(firstInfo, secondInfo, zoom, ImageIterator.Files);
             }
 
@@ -208,8 +220,8 @@ public class TabViewModel(Action<uint> closeTab, IFileWatcherService? fileWatche
             }
             var zoom = ZoomLevel.CurrentValue;
             var singleTitles = ImageTitleFormatter.GenerateTitleForSingleImage(width, height, nameTitle, zoom);
-            WindowTitle.Value = singleTitles.TitleWithAppName;
             Title.Value = singleTitles.BaseTitle;
+            WindowTitle.Value = singleTitles.TitleWithAppName;
             TitleTooltip.Value = singleTitles.FilePathTitle;
         }
         
@@ -258,7 +270,6 @@ public class TabViewModel(Action<uint> closeTab, IFileWatcherService? fileWatche
         if (thumbnailCache != null)
         {
             ThumbnailCache = thumbnailCache;
-            ThumbnailCache.RemoveOwner(Id);
         }
         ImageIterator ??= new ImageIterator(cache, thumbCache, thumbnailLoader, this);
         if (Model?.FileInfo is null)
@@ -302,12 +313,12 @@ public class TabViewModel(Action<uint> closeTab, IFileWatcherService? fileWatche
     {
         IsClosing = true; // Signal it to be removed from the UI
         closeTab(Id);
-        Dispose();
+        // Dispose has already been called in the CloseTab method
     }
 
     public CancellationTokenSource GetTabCancellation()
     {
-        if (!NavigationCts.IsCancellationRequested)
+        if ( !NavigationCts.IsCancellationRequested)
         {
             return NavigationCts;
         }
@@ -316,6 +327,13 @@ public class TabViewModel(Action<uint> closeTab, IFileWatcherService? fileWatche
         NavigationCts = new CancellationTokenSource();
         oldCts.Dispose();
         return NavigationCts;
+    }
+    
+    public void ResetNavigationCts()
+    {
+        NavigationCts?.Cancel();
+        NavigationCts?.Dispose();
+        NavigationCts = new CancellationTokenSource();
     }
 
     public void DisposeImageIterator()
@@ -335,6 +353,7 @@ public class TabViewModel(Action<uint> closeTab, IFileWatcherService? fileWatche
         ThumbnailCache?.RemoveOwner(Id);
 
         ImageIterator?.Dispose();
+        ArchiveExtractionService.Cleanup();
 
         NavigationCts.Dispose();
         Disposables.Dispose();

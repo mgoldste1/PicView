@@ -43,7 +43,7 @@ public static class ImageFormatConverter
         else if (tab.ImageIterator.Files.Count <= 0 && !string.IsNullOrEmpty(path))
         {
             // Handle effects for the current file
-            if (core.Effects.EffectConfig?.Value is not null && tab.FileInfo?.CurrentValue.FullName == path)
+            if (core.Effects?.EffectConfig?.Value is not null && tab.FileInfo?.CurrentValue.FullName == path)
             {
                 if (tab.Image.CurrentValue is Bitmap bmp)
                 {

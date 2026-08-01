@@ -6,7 +6,9 @@ using Avalonia.Interactivity;
 using PicView.Avalonia.CustomControls;
 using PicView.Avalonia.DragAndDrop;
 using PicView.Avalonia.UI;
+using PicView.Avalonia.Views.UC.PopUps;
 using PicView.Avalonia.WindowBehavior;
+using PicView.Core.Sizing;
 using PicView.Core.ViewModels;
 
 namespace PicView.Avalonia.Views.UC;
@@ -50,7 +52,11 @@ public partial class BottomBar : UserControl, IDisposable
 
     private void OnPointerExited(object? sender, PointerEventArgs e)
     {
-        DragAndDropManager.RemoveDragDropView();
+        if (TopLevel.GetTopLevel(this) is not MainWindow mainWindow)
+        {
+            return;
+        }
+        DragAndDropManager.RemoveDragDropView(mainWindow);
     }
 
     private void OnPreviousButtonClick(object? sender, RoutedEventArgs e)
@@ -101,9 +107,23 @@ public partial class BottomBar : UserControl, IDisposable
 
     private void OnFileMenuButtonClick(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is MainWindowViewModel vm)
+        if (DataContext is not MainWindowViewModel vm)
         {
-            vm.TopTitlebarViewModel.CloseDropDownMenu();
+            return;
+        }
+
+        if (Bounds.Width <= SizeDefaults.BottomMenusBp)
+        {
+            if (TopLevel.GetTopLevel(this) is not MainWindow mainWindow)
+            {
+                return;
+            }
+
+            mainWindow.AddQuickEditingDialog();
+        }
+        else
+        {
+            vm.TopTitlebarViewModel.DropDownMenu.ToggleFileMenu();
         }
     }
 
@@ -141,9 +161,23 @@ public partial class BottomBar : UserControl, IDisposable
 
     private void OnSettingsMenuButtonClick(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is MainWindowViewModel vm)
+        if (DataContext is not MainWindowViewModel vm)
         {
-            vm.TopTitlebarViewModel.CloseDropDownMenu();
+            return;
+        }
+
+        if (Bounds.Width <= SizeDefaults.BottomMenusBp)
+        {
+            if (TopLevel.GetTopLevel(this) is not MainWindow mainWindow)
+            {
+                return;
+            }
+
+            mainWindow.AddQuickSettingsDialog();
+        }
+        else
+        {
+            vm.TopTitlebarViewModel.DropDownMenu.ToggleSettingsMenu();
         }
     }
     
@@ -251,25 +285,24 @@ public partial class BottomBar : UserControl, IDisposable
             vm.TopTitlebarViewModel.CloseDropDownMenu();
         }
 
-        if (TopLevel.GetTopLevel(this) is Window window)
+        if (TopLevel.GetTopLevel(this) is MainWindow mainWindow)
         {
-            WindowFunctions.WindowDragBehavior(window, e);
+            WindowFunctions.WindowDragBehavior(mainWindow, e);
         }
     }
 
-    public void ResponsiveNavigationBtnSize()
+    public void ResponsiveNavigationBtnSize(double width)
     {
-        var width = MainBottomBorder.Bounds.Width;
         switch (width)
         {
-            case > 520:
+            case > SizeDefaults.FullBtnBp:
                 ResetZoomButton.IsVisible = RotateLeftButton.IsVisible = true;
                 PreviousButton.Width = NextButton.Width = 80;
                 return;
-            case < 520 and > 430:
+            case < SizeDefaults.FullBtnBp and > SizeDefaults.SearchResetAndRotateBtnBp:
                 PreviousButton.Width = NextButton.Width = 65;
                 break;
-            case < 430 and > 350:
+            case < SizeDefaults.SearchResetAndRotateBtnBp and > SizeDefaults.SmallNavBtnBp:
                 PreviousButton.Width = NextButton.Width = 60;
                 break;
             default:
@@ -278,7 +311,7 @@ public partial class BottomBar : UserControl, IDisposable
                 break;
         }
 
-        if (width < 430)
+        if (width < SizeDefaults.SearchResetAndRotateBtnBp)
         {
             ResetZoomButton.IsVisible = RotateLeftButton.IsVisible = false;
         }
@@ -286,7 +319,7 @@ public partial class BottomBar : UserControl, IDisposable
         {
             ZoomInButton.Width = ZoomOutButton.Width = FlipButton.Width = RotateRightButton.Width = 38;
         }
-    }   
+    }
     
     public void Dispose()
     {

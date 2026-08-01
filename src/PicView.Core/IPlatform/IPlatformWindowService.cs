@@ -46,6 +46,8 @@ public interface IPlatformWindowService
     void ShowSingleImageResizeWindow();
     
     ValueTask ShowBatchResizeWindow();
+    
+    void ShowFileAssociationsWindow();
 
     void ShowConvertWindow();
     

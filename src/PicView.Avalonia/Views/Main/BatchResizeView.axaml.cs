@@ -15,6 +15,9 @@ namespace PicView.Avalonia.Views.Main;
 public partial class BatchResizeView : UserControl
 {
     private readonly CompositeDisposable _disposables = new();
+    private bool _suppressAspectRatioUpdate;
+    private double _aspectRatio;
+
     public BatchResizeView()
     {
         InitializeComponent();
@@ -23,8 +26,8 @@ public partial class BatchResizeView : UserControl
 
     private void OnLoaded(object? sender, RoutedEventArgs e)
     {
-        SubscribeToEvents();
         InitializeData();
+        SubscribeToEvents();
         if (!Settings.Theme.Dark || Settings.Theme.GlassTheme)
         {
             ColorThemeAdjustments();
@@ -83,7 +86,13 @@ public partial class BatchResizeView : UserControl
         }
         var batch = core.BatchResize;
         
-        CancelButton.Click += delegate { (VisualRoot as Window)?.Close(); };
+        CancelButton.Click += delegate
+        {
+            if (TopLevel.GetTopLevel(this) is Window window)
+            {
+                window.Close();
+            }
+        };
         Observable.EveryValueChanged(this, x => x.ConversionComboBox.SelectedIndex)
             .Subscribe(x =>
             {
@@ -105,6 +114,13 @@ public partial class BatchResizeView : UserControl
                 {
                     LinkChainImage.IsVisible = true;
                     UnlinkChainImage.IsVisible = false;
+
+                    var w = batch.WidthValue.CurrentValue;
+                    var h = batch.HeightValue.CurrentValue;
+                    if (w > 0 && h > 0)
+                    {
+                        _aspectRatio = (double)w / h;
+                    }
                 }
                 else
                 {
@@ -155,7 +171,6 @@ public partial class BatchResizeView : UserControl
         {
             return;
         }
-        var batch = core.BatchResize;
 
         var oneBased = i;
         i++;
@@ -163,7 +178,15 @@ public partial class BatchResizeView : UserControl
         var (percentageItem, widthItem, heightItem, valueBox, outputBox, comboBox) =
             GetThumbControls(i);
 
+        UpdateThumbValues();
         valueBox.TextChanged += delegate
+        {
+            UpdateThumbValues();
+        };
+        
+        return;
+
+        void UpdateThumbValues()
         {
             var (thumbIsPercentageResized, thumbIsWidthResized, thumbIsHeightResized, saveDestination) =
                 GetUserInputtedOptions(percentageItem, widthItem, heightItem, outputBox, comboBox);
@@ -176,19 +199,19 @@ public partial class BatchResizeView : UserControl
 
             if (thumbIsPercentageResized)
             {
-                batch.Thumbs[oneBased] = new BatchThumb(saveDestination, new Percentage(thumbValue));
+                core.BatchResize.Thumbs[oneBased] = new BatchThumb(saveDestination, new Percentage(thumbValue));
             }
 
             if (thumbIsWidthResized)
             {
-                batch.Thumbs[oneBased] = new BatchThumb(saveDestination, width: thumbValue);
+                core.BatchResize.Thumbs[oneBased] = new BatchThumb(saveDestination, width: thumbValue);
             }
 
             if (thumbIsHeightResized)
             {
-                batch.Thumbs[oneBased] = new BatchThumb(saveDestination, height: thumbValue);
+                core.BatchResize.Thumbs[oneBased] = new BatchThumb(saveDestination, height: thumbValue);
             }
-        };
+        }
     }
 
     private (ComboBoxItem? percentageItem, ComboBoxItem? widthItem, ComboBoxItem? heightItem, TextBox? valueBox, TextBox
@@ -333,5 +356,69 @@ public partial class BatchResizeView : UserControl
     {
         base.OnDetachedFromLogicalTree(e);
         _disposables.Dispose();
+    }
+
+    private void WidthBox_OnTextChanged(object? sender, TextChangedEventArgs e)
+    {
+        if (_suppressAspectRatioUpdate)
+        {
+            return;
+        }
+        if (Application.Current.DataContext is not CoreViewModel core)
+        {
+            return;
+        }
+        var batch = core.BatchResize;
+        if (!batch.IsKeepingAspectRatio.Value || _aspectRatio <= 0)
+        {
+            return;
+        }
+        if (!uint.TryParse(WidthBox.Text, out var width) || width == 0)
+        {
+            return;
+        }
+
+        var newHeight = (uint)Math.Max(1, Math.Round(width / _aspectRatio));
+        _suppressAspectRatioUpdate = true;
+        try
+        {
+            batch.HeightValue.Value = newHeight;
+        }
+        finally
+        {
+            _suppressAspectRatioUpdate = false;
+        }
+    }
+
+    private void HeightBox_OnTextChanged(object? sender, TextChangedEventArgs e)
+    {
+        if (_suppressAspectRatioUpdate)
+        {
+            return;
+        }
+        if (Application.Current.DataContext is not CoreViewModel core)
+        {
+            return;
+        }
+        var batch = core.BatchResize;
+        if (!batch.IsKeepingAspectRatio.Value || _aspectRatio <= 0)
+        {
+            return;
+        }
+        if (!uint.TryParse(HeightBox.Text, out var height) || height == 0)
+        {
+            return;
+        }
+
+        var newWidth = (uint)Math.Max(1, Math.Round(height * _aspectRatio));
+        _suppressAspectRatioUpdate = true;
+        try
+        {
+            batch.WidthValue.Value = newWidth;
+        }
+        finally
+        {
+            _suppressAspectRatioUpdate = false;
+        }
     }
 }

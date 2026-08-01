@@ -1,6 +1,5 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
 using PicView.Avalonia.CustomControls;
 using PicView.Avalonia.Navigation.Services;
@@ -14,7 +13,7 @@ namespace PicView.Avalonia.UI;
 
 public static class ToggleUIVisibility
 {
-    public static async ValueTask ToggleBottomBar(MainWindowViewModel vm)
+    public static async ValueTask ToggleBottomBar(MainWindowViewModel vm, MainWindow mainWindow)
     {
         if (Settings.UIProperties.ShowBottomNavBar)
         {
@@ -24,7 +23,7 @@ public static class ToggleUIVisibility
             vm.WindowTabs.ActiveTab.CurrentValue.Hoverbar.IsHoverbarVisible.Value =
                 Settings.UIProperties.ShowHoverNavigationBar;
 
-            WindowResizing.SetSize(vm, WindowResizeReason.Layout);
+            WindowResizing.SetSize(mainWindow, WindowResizeReason.Layout);
         }
         else
         {
@@ -34,21 +33,15 @@ public static class ToggleUIVisibility
             vm.Translation.IsShowingBottomToolbar.Value = TranslationManager.Translation.HideBottomToolbar;
             vm.WindowTabs.ActiveTab.CurrentValue.Hoverbar.IsHoverbarVisible.Value = false;
 
-            WindowResizing.SetSize(vm, WindowResizeReason.Layout);
+            WindowResizing.SetSize(mainWindow, WindowResizeReason.Layout);
 
-            if (Application.Current.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime
-                {
-                    MainWindow: MainWindow mainWindow
-                })
-            {
-                Dispatcher.UIThread.Post(() => mainWindow.SharedBottomBar.ResponsiveNavigationBtnSize());
-            }
+            Dispatcher.UIThread.Post(() => mainWindow.SharedBottomBar.ResponsiveNavigationBtnSize(mainWindow.Bounds.Width));
         }
 
         await SaveSettingsAsync();
     }
 
-    public static async ValueTask ToggleInterface(MainWindowViewModel vm)
+    public static async ValueTask ToggleInterface(MainWindowViewModel vm, MainWindow mainWindow)
     {
         var tab = vm.WindowTabs.ActiveTab.CurrentValue;
         if (Settings.UIProperties.ShowInterface)
@@ -64,7 +57,7 @@ public static class ToggleUIVisibility
             if (!Settings.Gallery.ShowDockedGalleryInHiddenUI)
             {
                 // Hide gallery if not enabled
-                tab.Gallery.GalleryMode.Value = GalleryMode2.Closed;
+                tab.Gallery.ActiveGalleryMode.Value = GalleryMode.Closed;
                 tab.Gallery.IsGalleryDocked.Value = false;
             }
         }
@@ -90,18 +83,23 @@ public static class ToggleUIVisibility
             {
                 if (tab.ImageIterator.Files.Count > 0)
                 {
-                    if (Application.Current.DataContext is CoreViewModel core)
+                    if (Application.Current.DataContext is not CoreViewModel core)
+                    {
+                        return;
+
+                    }
+
+                    if (tab.Gallery.LoadingState is GalleryLoadingState.NotLoaded)
                     {
                         _ = GalleryLoader.LoadGalleryAsync(
                                 core.MainWindows.ActiveWindow.Value.WindowTabs.ActiveTab.Value,
                                 core.MainWindows.ActiveWindow.Value.WindowTabs.ActiveTab.Value.ImageIterator.Files,
-                                new AvaloniaThumbnailLoader(),
+                                ServiceHelper.ThumbLoader,
                                 core.SharedThumbnailCache,
                                 core.MainWindows.ActiveWindow.Value.WindowTabs.ActiveTab.Value.GetTabCancellation()
                                     .Token)
                             .ConfigureAwait(false);
                     }
-
                 }
 
                 tab.Gallery.IsDockedGalleryVisible.Value = true;
@@ -113,14 +111,11 @@ public static class ToggleUIVisibility
         }
 
         vm.TopTitlebarViewModel.CloseDropDownMenu();
-        WindowResizing.SetSize(vm, WindowResizeReason.Layout);
-        if (Application.Current.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime
-            {
-                MainWindow: MainWindow mainWindow
-            })
+        Dispatcher.UIThread.Post(() =>
         {
-            Dispatcher.UIThread.Post(() => mainWindow.SharedBottomBar.ResponsiveNavigationBtnSize());
-        }
+            WindowResizing.SetSize(mainWindow, WindowResizeReason.Layout);
+            mainWindow.SharedBottomBar.ResponsiveNavigationBtnSize(mainWindow.Bounds.Width);
+        }, DispatcherPriority.Render);
 
         await SaveSettingsAsync();
     }
@@ -144,4 +139,32 @@ public static class ToggleUIVisibility
         await SaveSettingsAsync();
     }
 
+    public static void RestoreInterface(MainWindowViewModel vm)
+    {
+        vm.IsUIShown.Value = Settings.UIProperties.ShowInterface;
+        
+        if (!Settings.UIProperties.ShowInterface)
+        {
+            return;
+        }
+        
+        vm.IsTopToolbarShown.Value = true;
+        vm.TitlebarHeight.Value = SizeDefaults.MainTitlebarHeight;
+        
+        if (!Settings.UIProperties.ShowBottomNavBar)
+        {
+            return;
+        }
+        
+        vm.IsBottomToolbarShown.Value = true;
+        vm.BottombarHeight.Value = SizeDefaults.BottombarHeight;
+    }
+    
+    
+    public static void HideInterface(MainWindowViewModel vm)
+    {
+        vm.IsBottomToolbarShown.Value = false;
+        vm.IsTopToolbarShown.Value = false;
+        vm.IsUIShown.Value = false;
+    }
 }

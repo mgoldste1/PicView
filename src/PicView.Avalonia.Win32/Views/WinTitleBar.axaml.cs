@@ -24,6 +24,10 @@ public partial class WinTitleBar : MainTitleBar
             {
                 ApplyGlassThemeStyles();
             }
+            else if (!Settings.Theme.Dark)
+            {
+                ApplyLightThemeStyles();
+            }
 
             InitializeEventHandlers();
         };
@@ -43,13 +47,26 @@ public partial class WinTitleBar : MainTitleBar
         GlassThemeHelper.ApplyTransparentStyle(MenuButton);
         GlassThemeHelper.ApplyTransparentStyle(MainMenu);
 
-        var glassForeground = UIHelper.GetBrush("SecondaryTextColor");
-        EditableTitlebar.Foreground = glassForeground;
-        CloseButton.Foreground = glassForeground;
-        MinimizeButton.Foreground = glassForeground;
-        RestoreButton.Foreground = glassForeground;
-        DropDownMenuButton.Foreground = glassForeground;
-        MenuButton.Foreground = glassForeground;
+        SetSecondaryForeground();
+    }
+    
+    private void SetSecondaryForeground()
+    {
+        var secondaryTextColor = UIHelper.GetBrush("SecondaryTextColor");
+        EditableTitlebar.Foreground = secondaryTextColor;
+        CloseButton.Foreground = secondaryTextColor;
+        MinimizeButton.Foreground = secondaryTextColor;
+        RestoreButton.Foreground = secondaryTextColor;
+        DropDownMenuButton.Foreground = secondaryTextColor;
+        MenuButton.Foreground = secondaryTextColor;
+    }
+    
+    private void ApplyLightThemeStyles()
+    {
+        UIHelper.SwitchHoverBorderClass(MenuButton);
+        UIHelper.SwitchHoverBorderClass(SearchButton);
+        UIHelper.SwitchHoverBorderClass(DropDownMenuButton);
+        UIHelper.SwitchHoverBorderClass(CreateTabButton);
     }
     
     private void InitializeEventHandlers()
@@ -62,13 +79,14 @@ public partial class WinTitleBar : MainTitleBar
         MainMenu.Closed += (_, _) => { CloseMenu(); };
         
         Observable.EveryValueChanged(vm.TopTitlebarViewModel.IsMainMenuVisible, x => x.Value,
-                UIHelper.GetFrameProvider)
+                mainWindow.FrameProvider)
+            .Skip(1)
             .Subscribe( isVisible =>
             {
                 if (isVisible)
                 {
                     // Overflow buttons if the window is too small
-                    if (Bounds.Width - SearchButton.Bounds.Width - DropDownMenuButton.Bounds.Width - CreateTabButton.Bounds.Width < SizeDefaults.SecondaryWindowMinWidth)
+                    if (Bounds.Width - SearchButton.Bounds.Width - CreateTabButton.Bounds.Width < SizeDefaults.MainTitleDropDownBtnBp)
                     {
                         OpenTruncatedMenu(vm);
                     }
@@ -90,6 +108,8 @@ public partial class WinTitleBar : MainTitleBar
         OpenMenu();
         vm.TopTitlebarViewModel.IsBtnPanelVisible.Value = false;
         LogoBorder.IsVisible = false;
+        CreateTabButton.IsVisible = false;
+        
         const int menuItemsCount = 7;
         vm.TopTitlebarViewModel.MaxItemWidth.Value = Bounds.Width / menuItemsCount;
         
@@ -109,6 +129,7 @@ public partial class WinTitleBar : MainTitleBar
         vm.TopTitlebarViewModel.IsBtnPanelVisible.Value = true;
         LogoBorder.IsVisible = true;
         vm.TopTitlebarViewModel.MaxItemWidth.Value = double.NaN;
+        CreateTabButton.IsVisible = false;
                 
         var regularPadding = new Thickness(8);
         FileMenuItem.Padding = regularPadding;
@@ -133,6 +154,7 @@ public partial class WinTitleBar : MainTitleBar
         LogoBorder.IsVisible = true;
         vm.TopTitlebarViewModel.MaxItemWidth.Value = double.NaN;
         DropDownMenuButton.IsVisible = Bounds.Width > SizeDefaults.MainTitleDropDownBtnBp;
+        CreateTabButton.IsVisible = true;
     }
 
     private void CloseMenu()

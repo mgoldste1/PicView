@@ -1,9 +1,7 @@
-﻿using System.ComponentModel;
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
-using Avalonia.Layout;
 using Avalonia.Media;
 using PicView.Avalonia.Crop;
 using PicView.Avalonia.CustomControls;
@@ -28,10 +26,11 @@ public partial class MainView : UserControl
         if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
         {
             // Move alt hover to left side on macOS and switch button order
-            AltButtonsPanel.HorizontalAlignment = HorizontalAlignment.Left; 
-            AltButtonsPanel.Children.Move(AltButtonsPanel.Children.IndexOf(AltClose),0);
-            AltButtonsPanel.Children.Move(AltButtonsPanel.Children.IndexOf(AltMinimize),2);
-            AltMinimize.RenderTransform = new ScaleTransform{ScaleX = -1};
+            DockPanel.SetDock(AltClose, Dock.Left);
+            DockPanel.SetDock(AltMinimize, Dock.Left);
+            DockPanel.SetDock(AltRestore, Dock.Left);
+            DockPanel.SetDock(AltTitleBorder, Dock.Right);
+            AltTitleBorder.BorderThickness = new Thickness(1,0,0,1);
         }
 
 
@@ -43,14 +42,6 @@ public partial class MainView : UserControl
 
             LostFocus += HandleLostFocus;
             PointerPressed += PointerPressedBehavior;
-
-            if (Resources.TryGetResource("MainContextMenu", Application.Current.ActualThemeVariant, out var value))
-            {
-                if (value is ContextMenu mainContextMenu)
-                {
-                    mainContextMenu.Opening += OnMainContextMenuOpening;
-                }
-            }
             
             //MainTabControl.TabDetached += MainTabControlOnTabDetached;
             MainTabControl.TabCreated += MainTabControlOnTabCreated;
@@ -64,23 +55,15 @@ public partial class MainView : UserControl
         };
     }
 
-    private void OnMainContextMenuOpening(object? sender, CancelEventArgs e)
+    private void HandleContextMenuOpened()
     {
         if (DataContext is not MainWindowViewModel vm)
         {
             return;
         }
         var tab = vm.WindowTabs.ActiveTab.CurrentValue;
-        if (tab.CurrentView.CurrentValue is ImageViewer imageViewer)
-        {
-            // Cancel the context menu if the hover bar is visible, because custom pop-up dialogs are shown instead.
-            if (imageViewer.HoverBar.Opacity > 0)
-            {
-                e.Cancel = true;
-            }
-        }
         
-        CropManager.SetIfCropEnabled(vm);
+        tab.ShouldCropBeEnabled.Value = CropManager.SetIfCropEnabled(TopLevel.GetTopLevel(this) as MainWindow);
         tab.ShouldOptimizeImageBeEnabled.Value = ConversionHelper.DetermineIfOptimizeImageShouldBeEnabled(tab.FileInfo.CurrentValue);
         
         // Set source for ChangeCtrlZoomImage
@@ -98,6 +81,20 @@ public partial class MainView : UserControl
 
     private void MainTabControlOnTabCreated(object? sender, TabCreatedEventArgs e)
     {
+        if (DataContext is not MainWindowViewModel vm)
+        {
+            return;
+        }
+        var tabs = vm.WindowTabs.Tabs.CurrentValue;
+        if (tabs.Count >= 2)
+        {
+            AltButtonsPanel.Margin = new Thickness(0, SizeDefaults.TabHeight, 0, 0);
+        }
+        else
+        {
+            AltButtonsPanel.Margin = new Thickness(0);
+        }
+        
         // Only set the StartUpMenu if the View is currently null.
         // This prevents overwriting the view (e.g. an image) when reordering tabs,
         // as reordering triggers the TabCreated event again by recreating containers.
@@ -122,6 +119,16 @@ public partial class MainView : UserControl
             }
 
             tabViewModel.CurrentView.Value = startUpMenu;
+            tabViewModel.SetNewTabTitle();
+        }
+
+        // Fix blank tab title when creating first new tab
+        if (tabs.Count is 2)
+        {
+            if (tabs[0].CurrentView.CurrentValue is StartUpMenu)
+            {
+                tabs[0].SetNewTabTitle();
+            }
         }
     }
     private void MainTabControlOnSelectionChanged(object? sender, SelectionChangedEventArgs e)
@@ -137,32 +144,82 @@ public partial class MainView : UserControl
         }
 
         vm.WindowTabs.SelectTab(tab);
-        if (tab.Model?.FileInfo?.Exists == true)
+        if (string.IsNullOrEmpty(tab.Title.CurrentValue))
         {
-            tab.UpdateTabTitle();
-        }
-        else
-        {
-            tab.SetNewTabTitle();
+            if (tab.Model?.FileInfo?.Exists == true)
+            {
+                tab.UpdateTabTitle();
+            }
+            else
+            {
+                tab.SetNewTabTitle();
+            }
         }
 
-        tab.ImageIterator.UpdateNavigationProperties();
+        tab.ImageIterator?.UpdateNavigationProperties();
     }
 
     private void PointerPressedBehavior(object? sender, PointerPressedEventArgs e)
     {
-        if (MainKeyboardShortcuts.ShiftDown && !CropManager.IsCropping)
+        if (TopLevel.GetTopLevel(this) is not MainWindow mainWindow)
         {
-            var hostWindow = (Window)VisualRoot!;
-            WindowFunctions.WindowDragBehavior(hostWindow, e);
+            return;
         }
+
+        DragAndDropManager.RemoveDragDropView(mainWindow);
         
-        DragAndDropManager.RemoveDragDropView();
+        if (e.Properties.IsLeftButtonPressed)
+        {
+            if (MainKeyboardShortcuts.ShiftDown && !CropManager.IsCropping(mainWindow))
+            {
+                WindowFunctions.WindowDragBehavior(mainWindow, e);
+            }
+        }
+        else if (e.Properties.IsRightButtonPressed)
+        {
+            if (!Resources.TryGetResource("MainContextMenu", Application.Current.ActualThemeVariant, out var value))
+            {
+                return;
+            }
+
+            if (value is not ContextMenu mainContextMenu || DataContext is not MainWindowViewModel vm)
+            {
+                return;
+            }
+
+            var tab = vm.WindowTabs.ActiveTab.CurrentValue;
+            var view = tab.CurrentView.CurrentValue;
+            switch (view)
+            {
+                case CropControl:
+                    return; // Don't show this control's context menu, to not interfere with crop control's context menu
+                case ImageViewer viewer:
+                {
+                    // The click arrows and hoverbar have their own right-click interaction
+                    if (viewer.ClickArrowLeft.PolyButton.IsPointerOver || viewer.ClickArrowRight.PolyButton.IsPointerOver)
+                    {
+                        return;
+                    }
+                    if (viewer.HoverBar.BottomBorder.IsPointerOver)
+                    {
+                        return;
+                    }
+                    if (viewer.GalleryView.IsPointerOver)
+                    {
+                        return;
+                    }
+
+                    break;
+                }
+            }
+            mainContextMenu.Open(this);
+            HandleContextMenuOpened();
+        }
     }
     
-    private static void HandleLostFocus(object? sender, EventArgs e)
+    private void HandleLostFocus(object? sender, EventArgs e)
     {
-        DragAndDropManager.RemoveDragDropView();
+        DragAndDropManager.RemoveDragDropView(TopLevel.GetTopLevel(this) as MainWindow);
     }
 
     private async ValueTask Drop(object? sender, DragEventArgs e)
@@ -172,16 +229,25 @@ public partial class MainView : UserControl
             return;
         }
         
-        await DragAndDropManager.Drop(e, vm.WindowTabs);
+        await DragAndDropManager.Drop(e, vm.WindowTabs, TopLevel.GetTopLevel(this) as MainWindow);
     }
     
     private async ValueTask DragEnter(object? sender, DragEventArgs e)
     {
-        await DragAndDropManager.DragEnter(e, this);
+        await DragAndDropManager.DragEnter(e, TopLevel.GetTopLevel(this) as MainWindow);
     }
     
     private void DragLeave(object? sender, DragEventArgs e)
     {
-        DragAndDropManager.DragLeave(this);
+        DragAndDropManager.DragLeave(TopLevel.GetTopLevel(this) as MainWindow);
+    }
+
+    private void DragMove(object? sender, PointerPressedEventArgs e)
+    {
+        if (TopLevel.GetTopLevel(this) is not MainWindow { DataContext: MainWindowViewModel vm } mainWindow)
+        {
+            return;
+        }
+        WindowFunctions.WindowDragAndDoubleClickBehavior(mainWindow, e, vm.PlatformWindowService);
     }
 }

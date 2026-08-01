@@ -14,7 +14,7 @@ public class MainWindowViewModel : IDisposable
     public GallerySharedSettingsViewModel GallerySettings { get; }
     public GlobalSettingsViewModel GlobalSettings { get; }
     public TopTitlebarViewModel TopTitlebarViewModel { get; }  = new();
-    public TabOverviewViewModel WindowTabs { get; } = new();
+    public TabOverviewViewModel WindowTabs { get; }
     public ToolTipViewModel? ToolTip { get; set; }
     public PrintPreviewViewModel? PrintPreview { get; set; }
     public ImageInfoWindowViewModel? InfoWindow { get; set; } 
@@ -222,6 +222,9 @@ public class MainWindowViewModel : IDisposable
 
     public ReactiveCommand GalleryClickCommand { get; }
     private async ValueTask GalleryClick(Unit unit, CancellationToken cancellationToken) { if (Mapper is null) return; await Mapper.GalleryClick(); }
+    
+    public ReactiveCommand ToggleDockedGalleryInHiddenUICommand { get; }
+    private async ValueTask ToggleDockedGalleryInHiddenUI(Unit unit, CancellationToken cancellationToken) { if (Mapper is null) return; await Mapper.ToggleDockedGalleryInHiddenUI(); }
 
     #endregion
 
@@ -246,6 +249,9 @@ public class MainWindowViewModel : IDisposable
 
     public ReactiveCommand BatchResizeWindowCommand { get; }
     private async ValueTask BatchResizeWindow(Unit unit, CancellationToken cancellationToken) { if (Mapper is null) return; await Mapper.BatchResizeWindow(); }
+
+    public ReactiveCommand FileAssociationsWindowCommand { get; }
+    private async ValueTask FileAssociationsWindow(Unit unit, CancellationToken cancellationToken) { if (Mapper is null) return; await Mapper.FileAssociationsWindow(); }
 
     public ReactiveCommand SettingsWindowCommand { get; }
     private async ValueTask SettingsWindow(Unit unit, CancellationToken cancellationToken) { if (Mapper is null) return; await Mapper.SettingsWindow(); }
@@ -512,6 +518,9 @@ public class MainWindowViewModel : IDisposable
 
     public ReactiveCommand ToggleFileHistoryCommand { get; }
     private async ValueTask ToggleFileHistory(Unit unit, CancellationToken cancellationToken) { if (Mapper is null) return; await Mapper.ToggleFileHistory(); }
+    
+    public ReactiveCommand ToggleShowFullPathInTitleBarCommand { get; }
+    private async ValueTask ToggleShowFullPathInTitleBar(Unit unit, CancellationToken cancellationToken) { if (Mapper is null) return; await Mapper.ToggleShowFullPathInTitleBar(); }
 
     #endregion
     
@@ -523,6 +532,7 @@ public class MainWindowViewModel : IDisposable
         PlatformWindowService = windowService;
         GlobalSettings = globalSettings;
         GallerySettings = gallerySettings;
+        WindowTabs = new TabOverviewViewModel(this);
         
         // Navigation
         NextCommand = new ReactiveCommand(Next);
@@ -571,6 +581,7 @@ public class MainWindowViewModel : IDisposable
         OpenCloseBottomGalleryCommand = new ReactiveCommand(OpenCloseBottomGallery);
         CloseGalleryCommand = new ReactiveCommand(CloseGallery);
         GalleryClickCommand = new ReactiveCommand(GalleryClick);
+        ToggleDockedGalleryInHiddenUICommand = new ReactiveCommand(ToggleDockedGalleryInHiddenUI);
 
         // Windows & Dialogs
         AboutWindowCommand = new ReactiveCommand(AboutWindow);
@@ -581,6 +592,7 @@ public class MainWindowViewModel : IDisposable
         ImageInfoWindowCommand = new ReactiveCommand(ImageInfoWindow);
         ResizeWindowCommand = new ReactiveCommand(ResizeWindow);
         BatchResizeWindowCommand = new ReactiveCommand(BatchResizeWindow);
+        FileAssociationsWindowCommand = new ReactiveCommand(FileAssociationsWindow);
         SettingsWindowCommand = new ReactiveCommand(SettingsWindow);
 
         // Window State
@@ -675,6 +687,7 @@ public class MainWindowViewModel : IDisposable
         ShowRecentHistoryFileCommand = new ReactiveCommand(ShowRecentHistoryFile);
         ToggleOpeningInSameWindowCommand = new ReactiveCommand(ToggleOpeningInSameWindow);
         ToggleFileHistoryCommand = new ReactiveCommand(ToggleFileHistory);
+        ToggleShowFullPathInTitleBarCommand = new ReactiveCommand(ToggleShowFullPathInTitleBar);
     }
 
     public void Dispose()
@@ -739,6 +752,7 @@ public class MainWindowViewModel : IDisposable
             OpenCloseBottomGalleryCommand,
             CloseGalleryCommand,
             GalleryClickCommand,
+            ToggleDockedGalleryInHiddenUICommand,
             AboutWindowCommand,
             ConvertWindowCommand,
             KeybindingsWindowCommand,
@@ -823,6 +837,7 @@ public class MainWindowViewModel : IDisposable
             ShowRecentHistoryFileCommand,
             ToggleOpeningInSameWindowCommand,
             ToggleFileHistoryCommand,
+            ToggleShowFullPathInTitleBarCommand,
             IsBottomToolbarShown,
             IsAutoFit,
             IsSideBySide,

@@ -2,6 +2,7 @@
 using Avalonia.Controls;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
+using PicView.Avalonia.CustomControls;
 using PicView.Avalonia.Gallery;
 using PicView.Avalonia.UI;
 using PicView.Core.Sizing;
@@ -13,17 +14,17 @@ public static class WindowResizing
 {
     #region Window Resize Handling
 
-    public static bool KeepWindowSize(Window window, AvaloniaPropertyChangedEventArgs<Size> size)
+    private static bool KeepWindowSize(Window window, AvaloniaPropertyChangedEventArgs<Size> size)
     {
-        if (!size.OldValue.HasValue || !size.NewValue.HasValue ||
-            size.Sender != window || size.OldValue.Value.Width == 0 || size.OldValue.Value.Height == 0 ||
-            size.NewValue.Value.Width == 0 || size.NewValue.Value.Height == 0)
+        var oldSize = size.OldValue.Value;
+        var newSize = size.NewValue.Value;
+        
+        if (!size.OldValue.HasValue || !size.NewValue.HasValue || 
+            size.Sender != window || oldSize.Width is 0 || oldSize.Height is 0 ||
+            newSize.Width is 0 || newSize.Height is 0)
         {
             return false;
         }
-        
-        var oldSize = size.OldValue.Value;
-        var newSize = size.NewValue.Value;
 
         var x = (oldSize.Width - newSize.Width) / 2;
         var y = (oldSize.Height - newSize.Height) / 2;
@@ -32,43 +33,70 @@ public static class WindowResizing
         
         return true;
     }
+    
+    public static void FastCenterWindow(Window window)
+    {
+        var screen = ScreenHelper.ScreenSize;
 
-    public static void HandleWindowResize(Window window, AvaloniaPropertyChangedEventArgs<Size> size)
+        // Get the size of the window
+        var windowSize = window.ClientSize;
+
+        var x = screen.X;
+        var y = screen.Y;
+
+        // Calculate the position to center the window on the screen
+        var centeredX = x + (screen.WorkingAreaWidth - windowSize.Width) / 2;
+        var centeredY = y + (screen.WorkingAreaHeight - windowSize.Height) / 2;
+
+        // Set the window's new position
+        window.Position = new PixelPoint((int)centeredX, (int)centeredY);
+    }
+
+    public static void HandleWindowResize(MainWindow mainWindow, AvaloniaPropertyChangedEventArgs<Size> size)
     {
         if (!Settings.WindowProperties.AutoFit)
         {
             return;
         }
 
-        var isWindowResized = KeepWindowSize(window, size);
-        if (!isWindowResized)
+        if (Settings.WindowProperties.KeepCentered)
+        {
+            FastCenterWindow(mainWindow);
+        }
+        else
+        {
+            var isWindowResized = KeepWindowSize(mainWindow, size);
+            if (!isWindowResized)
+            {
+                return;
+            }
+        }
+        
+        if (mainWindow.DataContext is not MainWindowViewModel mainWindowVm)
         {
             return;
         }
         
-        if (window.DataContext is not MainWindowViewModel mainWindowVm)
-        {
-            return;
-        }
+        var nextNavX = size.NewValue.Value.Width > SizeDefaults.SearchResetAndRotateBtnBp ? 50 : 15;
 
         RepositionCursorIfTriggered(mainWindowVm.IsNavigationButtonLeftClicked,
             clicked => mainWindowVm.IsNavigationButtonLeftClicked = clicked,
-            () => UIHelper.GetBottomBar.PreviousButton,
-            new Point(50, 10));
+            () => mainWindow.UIHelper.GetBottomBar.PreviousButton,
+            new Point(nextNavX, 10));
 
         RepositionCursorIfTriggered(mainWindowVm.IsNavigationButtonRightClicked,
             clicked => mainWindowVm.IsNavigationButtonRightClicked = clicked,
-            () => UIHelper.GetBottomBar.NextButton,
-            new Point(50, 10));
+            () => mainWindow.UIHelper.GetBottomBar.NextButton,
+            new Point(nextNavX, 10));
 
         RepositionCursorIfTriggered(mainWindowVm.IsBottomToolbarRightRotationClicked,
             clicked => mainWindowVm.IsBottomToolbarRightRotationClicked = clicked,
-            () => UIHelper.GetBottomBar.RotateRightButton,
+            () => mainWindow.UIHelper.GetBottomBar.RotateRightButton,
             new Point(20, 10));
 
         RepositionCursorIfTriggered(mainWindowVm.IsBottomToolbarLeftRotationClicked,
             clicked => mainWindowVm.IsBottomToolbarLeftRotationClicked = clicked,
-            () => UIHelper.GetBottomBar.RotateLeftButton,
+            () => mainWindow.UIHelper.GetBottomBar.RotateLeftButton,
             new Point(20, 10));
 
         RepositionCursorIfTriggered(mainWindowVm.WindowTabs.ActiveTab.CurrentValue.Hoverbar.IsHoverNavigationButtonNextClicked,
@@ -129,9 +157,10 @@ public static class WindowResizing
     
     #region Set Window Size
 
-    public static void SetSize(MainWindowViewModel vm, WindowResizeReason reason)
+    public static void SetSize(MainWindow mainWindow, WindowResizeReason reason)
     {
-        var size = GetSize(vm);
+        var vm = mainWindow.DataContext as MainWindowViewModel;
+        var size = GetSize(mainWindow, vm);
 
         if (size is null)
         {
@@ -141,9 +170,9 @@ public static class WindowResizing
         SetSize(size.Value, reason, vm);
     }
 
-    public static void SetSize(double width, double height, double secondWidth, double secondHeight, WindowResizeReason reason, MainWindowViewModel vm)
+    public static void SetSize(double width, double height, double secondWidth, double secondHeight, WindowResizeReason reason, MainWindow mainWindow, MainWindowViewModel vm)
     {
-        var size = GetSize(width, height, secondWidth, secondHeight, vm.WindowTabs.ActiveTab.CurrentValue.RotationAngle.CurrentValue, vm);
+        var size = GetSize(width, height, secondWidth, secondHeight, vm.WindowTabs.ActiveTab.CurrentValue.RotationAngle.CurrentValue, mainWindow, vm);
 
         if (size is null || size.Value.WindowWidth is 0 || size.Value.WindowHeight is 0)
         {
@@ -189,27 +218,31 @@ public static class WindowResizing
             vm.WindowMaxWidth.Value =
                 vm.WindowMaxHeight.Value = double.NaN;
         }
-
     }
 
-    public static ImageSize? GetSize(MainWindowViewModel vm)
+    public static ImageSize? GetSize(MainWindow mainWindow, MainWindowViewModel vm)
     {
         if (vm?.WindowTabs.ActiveTab?.CurrentValue is not { } tab)
         {
             return null;
         }
         double width, height, secondaryWidth, secondaryHeight;
-        if (tab.Model?.FileInfo is not null)
+        if (tab.Model.FileInfo is not null)
         {
-            if (vm.WindowTabs.SharedCache?.TryGet(tab.Model.FileInfo, out var preloadValue) ?? false)
+            if (tab.Model.PixelHeight is not 0 && tab.Model.PixelWidth is not 0)
             {
-                width = preloadValue.ImageModel.PixelWidth;
-                height = preloadValue.ImageModel.PixelHeight;
+                width = tab.Model.PixelWidth;
+                height = tab.Model.PixelHeight;
             }
             else if (tab.Model.Image is Bitmap bitmap)
             {
                 width = bitmap.PixelSize.Width;
                 height = bitmap.PixelSize.Height;
+            }
+            else if (vm.WindowTabs.SharedCache?.TryGet(tab.Model.FileInfo, out var preloadValue) ?? false)
+            {
+                width = preloadValue.ImageModel.PixelWidth;
+                height = preloadValue.ImageModel.PixelHeight;
             }
             else
             {
@@ -251,13 +284,11 @@ public static class WindowResizing
             secondaryWidth = secondaryHeight = 0;
         }
         
-        return GetSize(width, height, secondaryWidth, secondaryHeight, tab.RotationAngle.CurrentValue,
-            vm);
+        return GetSize(width, height, secondaryWidth, secondaryHeight, tab.RotationAngle.CurrentValue, mainWindow, vm);
     }
 
     public static ImageSize? GetSize(double width, double height, double secondWidth, double secondHeight,
-        double rotation,
-        MainWindowViewModel vm)
+        double rotation, MainWindow mainWindow, MainWindowViewModel vm)
     {
         var screenSize = ScreenHelper.ScreenSize;
         var (uiBottomSize, uiTopSize, galleryWidth, galleryHeight) = GetContainerSize();
@@ -269,7 +300,7 @@ public static class WindowResizing
 
         // Controls may not be wired up yet during startup (UIHelper.SetControls runs after the
         // initial image subscription fires); skip resizing until the main view is available.
-        if (UIHelper.GetMainView is null)
+        if (mainWindow.UIHelper.GetMainView is null)
         {
             return null;
         }
@@ -304,22 +335,18 @@ public static class WindowResizing
 
         (double, double, double, double) GetContainerSize()
         {
-            return Dispatcher.CurrentDispatcher.CheckAccess() ? Get() : Dispatcher.CurrentDispatcher.Invoke(Get, DispatcherPriority.Send);
-
-            (double, double, double, double) Get()
+            var (gW, gH) = GalleryHelper.GetGallerySize(vm);
+            if (vm.WindowTabs.Tabs.CurrentValue.Count > 1)
             {
-                var (gW, gH) = GalleryHelper.GetGallerySize(vm);
-                if (vm.WindowTabs.Tabs.CurrentValue.Count > 1)
-                {
-                    uiTopSize = SizeDefaults.TabHeight + vm.TitlebarHeight.CurrentValue + 2;
-                }
-                else
-                {
-                    uiTopSize = vm.TitlebarHeight.CurrentValue + 2;
-                }
-
-                return (UIHelper.GetBottomBar?.Bounds.Height ?? 0, uiTopSize, gW, gH);
+                uiTopSize = SizeDefaults.TabHeight + vm.TitlebarHeight.CurrentValue + 2;
             }
+            else
+            {
+                uiTopSize = vm.TitlebarHeight.CurrentValue + 2;
+            }
+
+            uiBottomSize = Settings.UIProperties.ShowBottomNavBar ? SizeDefaults.BottombarHeight : 0;
+            return (uiBottomSize, uiTopSize, gW, gH);
         }
 
         (double, double) GetWindowSize()
@@ -328,18 +355,13 @@ public static class WindowResizing
 
             (double, double) Get()
             {
-                return (UIHelper.GetMainView.Bounds.Width, UIHelper.GetMainView.Bounds.Height);
+                return (mainWindow.UIHelper.GetMainView.Bounds.Width, mainWindow.UIHelper.GetMainView.Bounds.Height);
             }
         }
     }
 
     public static void SaveSize(Window window)
     {
-        if (Settings.WindowProperties.Maximized || Settings.WindowProperties.Fullscreen)
-        {
-            return;
-        }
-
         if (Dispatcher.CurrentDispatcher.CheckAccess())
         {
             Set();
@@ -357,6 +379,10 @@ public static class WindowResizing
             var left = window.Position.X;
             Settings.WindowProperties.Top = top;
             Settings.WindowProperties.Left = left;
+            if (Settings.WindowProperties.Maximized || Settings.WindowProperties.Fullscreen)
+            {
+                return;
+            }
             Settings.WindowProperties.Width = window.Bounds.Width;
             Settings.WindowProperties.Height = window.Bounds.Height;
         }

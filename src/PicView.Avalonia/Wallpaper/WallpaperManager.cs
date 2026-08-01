@@ -1,5 +1,6 @@
 ﻿using System.Runtime.InteropServices;
 using Avalonia;
+using Avalonia.Threading;
 using PicView.Avalonia.ImageHandling;
 using PicView.Avalonia.UI;
 using PicView.Core.ViewModels;
@@ -18,13 +19,11 @@ public static class WallpaperManager
         vm.IsLoadingIndicatorShown.Value = true;
         try
         {
-            var file = await ImageFormatConverter.ConvertToCommonSupportedFormatAsync(path, vm).ConfigureAwait(false);
+            var file = await ImageFormatConverter.ConvertToCommonSupportedFormatAsync(path, vm)
+                .ConfigureAwait(false);
 
-            if (Application.Current.DataContext is not CoreViewModel core)
-            {
-                return;
-            }
-            core.PlatformService?.SetAsWallpaper(file, GetWallpaperStyle(style));
+            var core = await Dispatcher.UIThread.InvokeAsync(() => Application.Current.DataContext as CoreViewModel);
+            core?.PlatformService?.SetAsWallpaper(file, GetWallpaperStyle(style));
         }
         catch (Exception e)
         {

@@ -8,6 +8,7 @@ using PicView.Avalonia.ImageHandling;
 using PicView.Avalonia.MacOS.Views;
 using PicView.Avalonia.SettingsManagement;
 using PicView.Avalonia.StartUp;
+using PicView.Avalonia.WindowBehavior;
 using PicView.Core.FileAssociations;
 using PicView.Core.FileSorting;
 using PicView.Core.IPlatform;
@@ -59,12 +60,12 @@ public class App : Application, IPlatformSpecificService
                         return;
                     }
 
-                    startUpFilePath = fileArgs.Files[0].Path.AbsolutePath;
+                    startUpFilePath = fileArgs.Files[0].Path.LocalPath;
                     await HandleInitialLoadOrConsecutive();
                 }
                 else if (e is ProtocolActivatedEventArgs protocolArgs)
                 {
-                    startUpFilePath = protocolArgs.Uri.AbsolutePath;
+                    startUpFilePath = protocolArgs.Uri.LocalPath;
                     await HandleInitialLoadOrConsecutive();
                 }
 
@@ -82,11 +83,13 @@ public class App : Application, IPlatformSpecificService
 
         _mainWindow = new MacMainWindow();
         _mainWindowViewModel = _mainWindow.DataContext as MainWindowViewModel;
+        _coreViewModel.MainWindows.MainWindows.Add(_mainWindowViewModel);
+        _coreViewModel.MainWindows.ActiveWindow.Value = _mainWindowViewModel;
         
         TranslationManager.Init();
         SettingsUpdater.InitializeSettings(_mainWindowViewModel, settingsExists);
-
-        StartUpHelper.HandleWindowScalingMode(_coreViewModel, _mainWindow);
+        WindowFunctions.HandleWindowScalingMode(_coreViewModel, _mainWindow);
+        _mainWindow.Show();
         
         var arg = Environment.GetCommandLineArgs();
         if (arg.Length > 1)
@@ -95,11 +98,22 @@ public class App : Application, IPlatformSpecificService
         }
         if (startUpFilePath is not null)
         {
-            Task.Run(() => QuickLoad.QuickLoadAsync(_coreViewModel, startUpFilePath, false));
+            Task.Run(() => QuickLoad.QuickLoadAsync(_mainWindow, _coreViewModel, startUpFilePath, false));
         }
         else
         {
-            StartUpHelper.StartUpMenuOrLastFile(_coreViewModel);
+            // Retry again because FileActivatedEventArgs is very fickle #360 
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (startUpFilePath is not null)
+                {
+                    Task.Run(() => QuickLoad.QuickLoadAsync(_mainWindow, _coreViewModel, startUpFilePath, false));
+                }
+                else
+                {
+                    StartUpHelper.StartUpMenuOrLastFile(_mainWindow, _coreViewModel);
+                }
+            }, DispatcherPriority.Background);
         }
         
         if (ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop)
@@ -107,7 +121,7 @@ public class App : Application, IPlatformSpecificService
             return;
         }
         
-        StartUpHelper.HandlePostWindowUpdates(_coreViewModel, settingsExists, desktop, _mainWindow);
+        StartUpHelper.HandlePostWindowUpdates(_coreViewModel, desktop, _mainWindow);
         
         return;
 
@@ -116,18 +130,13 @@ public class App : Application, IPlatformSpecificService
             if (!_isInitialLoad)
             {
                 _isInitialLoad = true;
-
-                // Force switch to ImageViewer (in case we were sitting on the Start Menu)
-                // _vm.ImageViewer ??= new ImageViewer();
-                // _vm.MainWindow.CurrentView.Value = _vm.ImageViewer;
-                //
-                // await NavigationManager.LoadPicFromStringAsync(startUpFilePath, _vm).ConfigureAwait(false);
+                await QuickLoad.QuickLoadAsync(_mainWindow, _coreViewModel, startUpFilePath, true, true).ConfigureAwait(false);
                 return;
             }
             if (Settings.UIProperties.OpenInSameWindow)
             {
                 Dispatcher.UIThread.Invoke(() => { _mainWindow.Activate(); }, DispatcherPriority.Send);
-                //await NavigationManager.LoadPicFromStringAsync(startUpFilePath, _vm).ConfigureAwait(false);
+                await _coreViewModel.MainWindows.ActiveWindow.CurrentValue.WindowTabs.LoadFromStringAsync(startUpFilePath).ConfigureAwait(false);
             }
             else
             {

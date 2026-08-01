@@ -27,7 +27,7 @@ public static class UpdateManager
 
 #if DEBUG
     // ReSharper disable once ConvertToConstant.Local
-    private static readonly bool ForceUpdate = false;
+    private static readonly bool ForceUpdate = true;
 #endif
 
     /// <summary>

@@ -6,8 +6,7 @@ using PicView.Avalonia.CustomControls;
 using PicView.Avalonia.MacOS.WindowImpl;
 using WindowInitializer = PicView.Avalonia.Services.WindowInitializer;
 using PicView.Avalonia.StartUp;
-using PicView.Avalonia.UI;
-using PicView.Avalonia.Views.UC;
+using PicView.Avalonia.WindowBehavior;
 using PicView.Core.DebugTools;
 using PicView.Core.IPlatform;
 using PicView.Core.ViewModels;
@@ -17,8 +16,6 @@ namespace PicView.Avalonia.MacOS.Views;
 
 public partial class MacMainWindow : MainWindow, IPlatformWindowService
 {
-    private static WindowInitializer? _windowInitializer;
-
     public MacMainWindow()
     {
         if (Application.Current.DataContext is not CoreViewModel core)
@@ -27,16 +24,17 @@ public partial class MacMainWindow : MainWindow, IPlatformWindowService
         }
         var mainWindowViewModel = new MainWindowViewModel(core.Translation, this, core.GlobalSettings, core.GallerySettings);
         DataContext = mainWindowViewModel;
-        core.MainWindows.MainWindows.Add(mainWindowViewModel);
-        core.MainWindows.ActiveWindow.Value = mainWindowViewModel;
+
         InitializeComponent();
         
         SharedBottomBar = BottomBar;
         SharedTitleBar = Titlebar;
+        SharedMainView = MainView;
+        UIHelper.Initialize(this);
 
         Loaded += delegate
         {
-            _windowInitializer ??= new WindowInitializer(new MacWindowProvider());
+            MainWindowInitializer ??= new WindowInitializer(new MacWindowProvider());
 
             if (DataContext is not MainWindowViewModel vm)
             {
@@ -210,7 +208,7 @@ public partial class MacMainWindow : MainWindow, IPlatformWindowService
                 newVm = newWindow.DataContext as MainWindowViewModel;
                 core.MainWindows.MainWindows.Add(newVm);
                 core.MainWindows.ActiveWindow.Value = newVm;
-                StartUpHelper.DetachedWindowStartup(core, desktop, newWindow);
+                WindowFunctions.DetachedWindowStartup(core, desktop, newWindow);
 
 
                 // Fix null DataContext
@@ -220,7 +218,7 @@ public partial class MacMainWindow : MainWindow, IPlatformWindowService
                 }
             }, DispatcherPriority.Send);
 
-            TabNavigationInitializer.InitializeDetachedWindow(parentVm, newVm, tab);
+            TabNavigationInitializer.InitializeDetachedWindow(this, parentVm, newVm, tab);
         });
     }
     
@@ -229,39 +227,42 @@ public partial class MacMainWindow : MainWindow, IPlatformWindowService
     public int CombinedTitleButtonsWidth { get; set; } = 165;
     
     public void ShowAboutWindow() =>
-        _windowInitializer?.ShowAboutWindow();
+        MainWindowInitializer?.ShowAboutWindow();
 
     public async Task ShowImageInfoWindow() =>
-        await _windowInitializer?.ShowImageInfoWindow(DataContext as MainWindowViewModel);
+        await MainWindowInitializer?.ShowImageInfoWindow(DataContext as MainWindowViewModel);
 
     public async Task ShowKeybindingsWindow() =>
-        await _windowInitializer?.ShowKeybindingsWindow();
+        await MainWindowInitializer?.ShowKeybindingsWindow();
 
     public async ValueTask ShowSettingsWindow()
     {
-        if (_windowInitializer is null)
+        if (MainWindowInitializer is null)
         {
             return;
         }
-        await _windowInitializer.ShowSettingsWindow();
+        await MainWindowInitializer.ShowSettingsWindow();
     }
 
     public void ShowSingleImageResizeWindow() =>
-        _windowInitializer?.ShowSingleImageResizeWindow();
+        MainWindowInitializer?.ShowSingleImageResizeWindow();
 
     public async ValueTask ShowBatchResizeWindow() =>
-        await _windowInitializer.ShowBatchResizeWindow();
+        await MainWindowInitializer.ShowBatchResizeWindow();
+
+    public void ShowFileAssociationsWindow() =>
+        MainWindowInitializer?.ShowFileAssociationsWindow();
 
     public void ShowEffectsWindow() =>
-        _windowInitializer?.ShowEffectsWindow();
+        _ = MainWindowInitializer?.ShowEffectsWindow();
 
     public void ShowConvertWindow() =>
-        _windowInitializer?.ShowConvertWindow();
+        MainWindowInitializer?.ShowConvertWindow();
     
     public async Task ShowPrintWindow(string path)
     {
         var vm = Dispatcher.UIThread.Invoke(() => DataContext as MainWindowViewModel);
-        await _windowInitializer.ShowPrintWindow(path, vm);
+        await MainWindowInitializer.ShowPrintWindow(path, vm);
     }
 
     /// <inheritdoc />

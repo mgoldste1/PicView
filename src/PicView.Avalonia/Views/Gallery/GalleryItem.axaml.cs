@@ -5,7 +5,6 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.LogicalTree;
-using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using PicView.Avalonia.Clipboard;
 using PicView.Avalonia.CustomControls;
@@ -168,12 +167,12 @@ public partial class GalleryItem : NavigateAbleItem
 
     private void CopyFile_OnClick(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is not GalleryItemViewModel item)
+        if (DataContext is not GalleryItemViewModel item || TopLevel.GetTopLevel(this) is not MainWindow mainWindow)
         {
             return;
         }
         var fileName = item.FileLocation.CurrentValue;
-        _ = ClipboardFileOperations.CopyFileToClipboard(fileName);
+        _ = ClipboardFileOperations.CopyFileToClipboard(fileName, mainWindow);
     }
 
     private void CopyImage_OnClick(object? sender, RoutedEventArgs e)
@@ -191,22 +190,22 @@ public partial class GalleryItem : NavigateAbleItem
 
     private void CopyBase64_OnClick(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is not GalleryItemViewModel item)
+        if (DataContext is not GalleryItemViewModel item || TopLevel.GetTopLevel(this) is not MainWindow mainWindow)
         {
             return;
         }
-        // TODO
-        //ClipboardImageOperations.CopyBase64ToClipboard(fileName);
+        _ = ClipboardImageOperations.CopyBase64ToClipboard(item.FileLocation.CurrentValue, mainWindow);
     }
 
     private void DuplicateFile_OnClick(object? sender, RoutedEventArgs e)
     {
-        if (Application.Current.DataContext is not CoreViewModel core || DataContext is not GalleryItemViewModel item)
+        if (Application.Current.DataContext is not CoreViewModel core || DataContext is not GalleryItemViewModel item
+            || TopLevel.GetTopLevel(this) is not MainWindow mainWindow)
         {
             return;
         }
         var fileName = item.FileLocation.CurrentValue;
-        ClipboardFileOperations.Duplicate(fileName, core.MainWindows.ActiveWindow.CurrentValue).ConfigureAwait(false);
+        ClipboardFileOperations.Duplicate(fileName, core.MainWindows.ActiveWindow.CurrentValue, mainWindow).ConfigureAwait(false);
     }
 
     private void DeleteFile_OnClick(object? sender, RoutedEventArgs e)

@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using PicView.Avalonia.CustomControls;
 using PicView.Avalonia.Views.UC;
 using PicView.Avalonia.WindowBehavior;
 using PicView.Core.ViewModels;
@@ -7,7 +8,7 @@ namespace PicView.Avalonia.ImageTransformations;
 
 public static class RotationManager
 {
-    public static void ResetZoomAndRotations(MainWindowViewModel vm)
+    public static void ResetZoomAndRotations(MainWindowViewModel vm, MainWindow mainWindow)
     {
         if (vm.WindowTabs.ActiveTab.CurrentValue.CurrentView.CurrentValue is ImageViewer imageViewer)
         {
@@ -17,11 +18,11 @@ public static class RotationManager
         
         if (Settings.WindowProperties.AutoFit)
         {
-            WindowResizing.SetSize(vm, WindowResizeReason.Layout);
+            WindowResizing.SetSize(mainWindow, WindowResizeReason.Layout);
         }
     }
     
-    public static void ResetZoom(MainWindowViewModel vm)
+    public static void ResetZoom(MainWindowViewModel vm, MainWindow mainWindow)
     {
         if (vm.WindowTabs.ActiveTab.CurrentValue.CurrentView.CurrentValue is not ImageViewer imageViewer)
         {
@@ -31,11 +32,11 @@ public static class RotationManager
         imageViewer.ResetZoom(Settings.Zoom.IsZoomAnimated);
         if (Settings.WindowProperties.AutoFit)
         {
-            WindowResizing.SetSize(vm, WindowResizeReason.Layout);
+            WindowResizing.SetSize(mainWindow, WindowResizeReason.Layout);
         }
     }
     
-    public static void Rotate(MainWindowViewModel vm, int angle)
+    public static void Rotate(MainWindowViewModel vm, int angle, MainWindow mainWindow)
     {
         if (vm.WindowTabs.ActiveTab.CurrentValue.CurrentView.CurrentValue is not ImageViewer imageViewer)
         {
@@ -46,11 +47,11 @@ public static class RotationManager
         
         if (Settings.WindowProperties.AutoFit)
         {
-            WindowResizing.SetSize(vm, WindowResizeReason.Layout);
+            WindowResizing.SetSize(mainWindow, WindowResizeReason.Layout);
         }
     }
     
-    public static void RotateRight(MainWindowViewModel vm)
+    public static void RotateRight(MainWindowViewModel vm, MainWindow mainWindow)
     {
         if (vm.WindowTabs.ActiveTab.CurrentValue.CurrentView.CurrentValue is not ImageViewer imageViewer)
         {
@@ -61,11 +62,11 @@ public static class RotationManager
         
         if (Settings.WindowProperties.AutoFit)
         {
-            WindowResizing.SetSize(vm, WindowResizeReason.Layout);
+            WindowResizing.SetSize(mainWindow, WindowResizeReason.Layout);
         }
     }
 
-    public static void RotateLeft(MainWindowViewModel vm)
+    public static void RotateLeft(MainWindowViewModel vm, MainWindow mainWindow)
     {
         if (vm.WindowTabs.ActiveTab.CurrentValue.CurrentView.CurrentValue is not ImageViewer imageViewer)
         {
@@ -76,7 +77,7 @@ public static class RotationManager
         
         if (Settings.WindowProperties.AutoFit)
         {
-            WindowResizing.SetSize(vm, WindowResizeReason.Layout);
+            WindowResizing.SetSize(mainWindow, WindowResizeReason.Layout);
         }
     }
     

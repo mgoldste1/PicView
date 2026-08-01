@@ -5,6 +5,8 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Threading;
+using PicView.Avalonia.CustomControls;
+using PicView.Avalonia.FileSystem;
 using PicView.Avalonia.UI;
 using PicView.Avalonia.Views.UC.PopUps;
 using PicView.Core.DebugTools;
@@ -26,8 +28,19 @@ public partial class HoverBar : UserControl, IDisposable
             ChangeHoverClasses();
         }
         
-        AddHandler(PointerPressedEvent, ManagePointerPressed, RoutingStrategies.Tunnel);
-        UIHelper.GetMainView.SizeChanged += (_, args) => ApplyResponsiveResize(args.NewSize.Width);
+        Loaded += OnLoaded;
+
+    }
+
+    private void OnLoaded(object? sender, RoutedEventArgs e)
+    {
+        if (TopLevel.GetTopLevel(this) is not MainWindow mainWindow)
+        {
+            return;
+        }
+        
+        AddHandler(PointerPressedEvent, ManagePointerPressed, RoutingStrategies.Direct | RoutingStrategies.Tunnel);
+        mainWindow.UIHelper.GetMainView.SizeChanged += (_, args) => ApplyResponsiveResize(args.NewSize.Width);
         ApplyResponsiveResize(Bounds.Width);
 
         if (Settings.Theme.GlassTheme)
@@ -92,7 +105,7 @@ public partial class HoverBar : UserControl, IDisposable
             })
             .AddTo(ref _disposables);
     }
-    
+
     #region Theming
 
     private void ChangeHoverClasses()
@@ -195,27 +208,33 @@ public partial class HoverBar : UserControl, IDisposable
                     ZoomOutMenuButton.IsVisible = showAdvancedButtons;
 
         IsVisible = true;
+        
+        if (TopLevel.GetTopLevel(this) is not MainWindow mainWindow)
+        {
+            return;
+        }
 
         // Make sure hover bar is above the bottom gallery if needed
         var newHeight = Settings.Gallery.IsGalleryDocked ? 50 : 160;
-        Height = UIHelper.GetMainView.Bounds.Height > SizeDefaults.WindowMinSize ? newHeight : double.NaN;
+        Height = mainWindow.UIHelper.GetMainView.Bounds.Height > SizeDefaults.WindowMinSize ? newHeight : double.NaN;
     }
 
 
     private async Task ManagePointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (Application.Current.DataContext is not CoreViewModel core)
+        if (Application.Current.DataContext is not CoreViewModel core || TopLevel.GetTopLevel(this) is not MainWindow mainWindow
+            || mainWindow.DataContext is not MainWindowViewModel vm)
         {
             return;
         }
         
         var props = e.Properties;
-        
+
         if (NextButton.IsPointerOver)
         {
             if (props.IsRightButtonPressed)
             {
-                ShowNavigationDialog();
+                mainWindow.AddNavigationDialog();
             }
             else if (props.IsLeftButtonPressed)
             {
@@ -226,7 +245,7 @@ public partial class HoverBar : UserControl, IDisposable
         {
             if (props.IsRightButtonPressed)
             {
-                ShowNavigationDialog();
+                mainWindow.AddNavigationDialog();
             }
             else if (props.IsLeftButtonPressed)
             {
@@ -237,7 +256,7 @@ public partial class HoverBar : UserControl, IDisposable
         {
             if (props.IsRightButtonPressed)
             {
-                ShowQuickSettingsDialog();
+                mainWindow.AddQuickSettingsDialog();
             }
             else if (props.IsLeftButtonPressed)
             {
@@ -248,7 +267,7 @@ public partial class HoverBar : UserControl, IDisposable
         {
             if (props.IsRightButtonPressed || props.IsLeftButtonPressed)
             {
-                ShowQuickEditingDialog();
+                mainWindow.AddQuickEditingDialog();
             }
         }
         else if (RotateLeftButton.IsPointerOver)
@@ -269,7 +288,7 @@ public partial class HoverBar : UserControl, IDisposable
         {
             if (props.IsRightButtonPressed)
             {
-                ShowSearchDialog();
+                mainWindow.AddFileSearchDialog();
 
                 // Wait for animation to finish to properly close tooltip
                 await Task.Delay(TimeSpan.FromSeconds(0.3));
@@ -277,30 +296,13 @@ public partial class HoverBar : UserControl, IDisposable
                     DispatcherPriority.Background);
             }
         }
-        else
-        {
-            if (props.IsRightButtonPressed)
-            {
-                UIHelper.ShowMainContextMenu();
-            }
-        }
     }
-
-    private static void ShowNavigationDialog() =>
-        DialogManager.AddNavigationDialog();
-
-    private static void ShowQuickSettingsDialog() =>
-        UIHelper.GetMainView.MainPanel.Children.Add(new QuickSettingsDialog());
-    
-    private static void ShowQuickEditingDialog() =>
-        UIHelper.GetMainView.MainPanel.Children.Add(new QuickEditingDialog());
-
-    private static void ShowSearchDialog() =>
-        DialogManager.AddFileSearchDialog();
 
     public void Dispose()
     {
+        Loaded -= OnLoaded;
         RemoveHandler(PointerPressedEvent, ManagePointerPressed);
         _disposables.Dispose();
+        GC.SuppressFinalize(this);
     }
 }

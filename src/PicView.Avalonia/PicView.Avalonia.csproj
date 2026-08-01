@@ -226,6 +226,18 @@
           <DependentUpon>RenameDialog.axaml</DependentUpon>
           <SubType>Code</SubType>
         </Compile>
+        <Compile Update="Views\Menu\DropDownMenu.axaml.cs">
+          <DependentUpon>DropDownMenu.axaml</DependentUpon>
+          <SubType>Code</SubType>
+        </Compile>
+        <Compile Update="Views\Menu\FileMenu.axaml.cs">
+          <DependentUpon>FileMenu.axaml</DependentUpon>
+          <SubType>Code</SubType>
+        </Compile>
+        <Compile Update="Views\Menu\SettingsMenu.axaml.cs">
+          <DependentUpon>SettingsMenu.axaml</DependentUpon>
+          <SubType>Code</SubType>
+        </Compile>
     </ItemGroup>
 
 
@@ -242,12 +254,12 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Avalonia" Version="12.0.4" />
-        <PackageReference Include="Avalonia.Desktop" Version="12.0.4" />
-        <PackageReference Condition="'$(Configuration)' == 'Debug'" Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.2" />
-        <PackageReference Include="Magick.NET.AvaloniaMediaImaging" Version="1.1.12" />
+        <PackageReference Include="Avalonia" Version="12.1.1" />
+        <PackageReference Include="Avalonia.Desktop" Version="12.1.1" />
+        <PackageReference Condition="'$(Configuration)' == 'Debug'" Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.3" />
+        <PackageReference Include="Magick.NET.AvaloniaMediaImaging" Version="1.1.14" />
         <PackageReference Include="R3Extensions.Avalonia" Version="1.3.1" />
-        <PackageReference Include="Svg.Controls.Skia.Avalonia" Version="12.0.0.11" />
+        <PackageReference Include="Svg.Controls.Skia.Avalonia" Version="12.0.0.13" />
     </ItemGroup>
 
     <ItemGroup>

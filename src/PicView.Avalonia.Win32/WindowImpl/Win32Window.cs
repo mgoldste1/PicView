@@ -2,6 +2,7 @@
 using Avalonia.Threading;
 using PicView.Avalonia.CustomControls;
 using PicView.Avalonia.Navigation;
+using PicView.Avalonia.UI;
 using PicView.Avalonia.Win32.Views;
 using PicView.Avalonia.WindowBehavior;
 using PicView.Core.Sizing;
@@ -28,14 +29,16 @@ public static class Win32Window
         vm.ShouldMaximizeBeShown.Value = true;
         vm.ShouldRestoreBeShown.Value = true;
         
+        vm.WindowMaxWidth.Value = vm.WindowMaxHeight.Value = double.NaN;
+        window.SizeToContent = SizeToContent.Manual;
         if (window.WindowState != WindowState.FullScreen)
         {
             window.WindowState = WindowState.FullScreen;
         }
         
-        HideInterface(vm);
+        ToggleUIVisibility.HideInterface(vm);
         
-        WindowResizing.SetSize(vm, WindowResizeReason.Application);
+        WindowResizing.SetSize(window, WindowResizeReason.Application);
         Dispatcher.UIThread.Post(() => window.IsChangingWindowState = false, DispatcherPriority.SystemIdle);
         
         if (saveSettings)
@@ -58,12 +61,14 @@ public static class Win32Window
         vm.ShouldMaximizeBeShown.Value = false;
         vm.ShouldRestoreBeShown.Value = true;
         
+        window.SizeToContent = SizeToContent.Manual;
+        vm.WindowMaxWidth.Value = vm.WindowMaxHeight.Value = double.NaN;
         if (window.WindowState != WindowState.Maximized)
         {
             window.WindowState = WindowState.Maximized;
         }
         
-        WindowResizing.SetSize(vm, WindowResizeReason.Application);
+        WindowResizing.SetSize(window, WindowResizeReason.Application);
         Dispatcher.UIThread.Post(() => window.IsChangingWindowState = false, DispatcherPriority.SystemIdle);
         
         if (saveSettings)
@@ -78,6 +83,11 @@ public static class Win32Window
         
         var wasFullscreen = window.WindowState == WindowState.FullScreen || Settings.WindowProperties.Fullscreen;
         
+        if (Settings.WindowProperties.AutoFit)
+        {
+            window.SizeToContent = SizeToContent.WidthAndHeight;
+        }
+        
         // Update settings
         Settings.WindowProperties.Maximized = false;
         Settings.WindowProperties.Fullscreen = false;
@@ -91,14 +101,21 @@ public static class Win32Window
 
         if (wasFullscreen)
         {
-            RestoreInterface(vm);
+            ToggleUIVisibility.RestoreInterface(vm);
         }
         
         window.WindowState = WindowState.Normal;
         
-        WindowResizing.SetSize(vm, WindowResizeReason.Application);
+        WindowResizing.SetSize(window, WindowResizeReason.Application);
         
-        Dispatcher.UIThread.Post(() => window.IsChangingWindowState = false, DispatcherPriority.SystemIdle);
+        Dispatcher.UIThread.Post(() =>
+        {
+            window.IsChangingWindowState = false;
+            if (Settings.WindowProperties.AutoFit)
+            {
+                window.SizeToContent = SizeToContent.WidthAndHeight;
+            }
+        }, DispatcherPriority.SystemIdle);
         
         if (saveSettings)
         {
@@ -144,43 +161,4 @@ public static class Win32Window
     {
         mainWindow.WindowState = WindowState.Minimized;
     }
-
-
-    #region Helpers
-
-    /// <summary>
-    /// Restores the interface based on settings
-    /// </summary>
-    private static void RestoreInterface(MainWindowViewModel vm)
-    {
-        vm.IsUIShown.Value = Settings.UIProperties.ShowInterface;
-        
-        if (!Settings.UIProperties.ShowInterface)
-        {
-            return;
-        }
-        
-        vm.IsTopToolbarShown.Value = true;
-        vm.TitlebarHeight.Value = SizeDefaults.MainTitlebarHeight;
-        
-        if (!Settings.UIProperties.ShowBottomNavBar)
-        {
-            return;
-        }
-        
-        vm.IsBottomToolbarShown.Value = true;
-        vm.BottombarHeight.Value = SizeDefaults.BottombarHeight;
-    }
-
-    /// <summary>
-    /// Hides interface elements for fullscreen mode
-    /// </summary>
-    private static void HideInterface(MainWindowViewModel vm)
-    {
-        vm.IsBottomToolbarShown.Value = false;
-        vm.IsTopToolbarShown.Value = false;
-        vm.IsUIShown.Value = false;
-    }
-
-    #endregion Helpers
 }

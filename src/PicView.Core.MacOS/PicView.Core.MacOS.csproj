@@ -21,6 +21,10 @@
     <IlcTrimMetadata>true</IlcTrimMetadata>
       
   </PropertyGroup>
+
+    <PropertyGroup>
+        <EnablePreviewFeatures>true</EnablePreviewFeatures>
+    </PropertyGroup>
     
 
   <ItemGroup>

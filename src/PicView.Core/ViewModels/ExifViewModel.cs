@@ -20,13 +20,15 @@ public class ExifViewModel : IDisposable
         OpenGoogleLinkCommand = new ReactiveCommand(OpenGoogleMaps);
         OpenBingLinkCommand = new ReactiveCommand(OpenBingMaps);
 
-        SetExifRating0Command = new ReactiveCommand<string>(async (s, _) => await SetRating(s, 0));
-        SetExifRating1Command = new ReactiveCommand<string>(async (s, _) => await SetRating(s, 1));
-        SetExifRating2Command = new ReactiveCommand<string>(async (s, _) => await SetRating(s, 2));
-        SetExifRating3Command = new ReactiveCommand<string>(async (s, _) => await SetRating(s, 3));
-        SetExifRating4Command = new ReactiveCommand<string>(async (s, _) => await SetRating(s, 4));
-        SetExifRating5Command = new ReactiveCommand<string>(async (s, _) => await SetRating(s, 5));
+        SetExifRating0Command = new ReactiveCommand<FileInfo>(async (s, _) => await SetRating(s, 0));
+        SetExifRating1Command = new ReactiveCommand<FileInfo>(async (s, _) => await SetRating(s, 1));
+        SetExifRating2Command = new ReactiveCommand<FileInfo>(async (s, _) => await SetRating(s, 2));
+        SetExifRating3Command = new ReactiveCommand<FileInfo>(async (s, _) => await SetRating(s, 3));
+        SetExifRating4Command = new ReactiveCommand<FileInfo>(async (s, _) => await SetRating(s, 4));
+        SetExifRating5Command = new ReactiveCommand<FileInfo>(async (s, _) => await SetRating(s, 5));
 
+        RemoveImageMetaDataCommand = new ReactiveCommand<FileInfo>(async (f, _) => await RemoveImageMetaData(f));
+        
         SetDateTakenCommand = new ReactiveCommand<FileInfo>(async (f, _) => await SetDateTaken(f));
 
         SetAuthorsCommand = new ReactiveCommand<string>(async (s, _) => { Authors.Value = s; await AddExifPropertyAsync(ExifWriter.AddAuthors, s); });
@@ -153,13 +155,13 @@ public class ExifViewModel : IDisposable
     public ReactiveCommand? OpenGoogleLinkCommand { get; }
     public ReactiveCommand? OpenBingLinkCommand { get; }
 
-    public ReactiveCommand<string>? SetExifRating0Command { get; set; }
-    public ReactiveCommand<string>? SetExifRating1Command { get; set; }
-    public ReactiveCommand<string>? SetExifRating2Command { get; set; }
-    public ReactiveCommand<string>? SetExifRating3Command { get; set; }
-    public ReactiveCommand<string>? SetExifRating4Command { get; set; }
-    public ReactiveCommand<string>? SetExifRating5Command { get; set; }
-
+    public ReactiveCommand<FileInfo>? SetExifRating0Command { get; set; }
+    public ReactiveCommand<FileInfo>? SetExifRating1Command { get; set; }
+    public ReactiveCommand<FileInfo>? SetExifRating2Command { get; set; }
+    public ReactiveCommand<FileInfo>? SetExifRating3Command { get; set; }
+    public ReactiveCommand<FileInfo>? SetExifRating4Command { get; set; }
+    public ReactiveCommand<FileInfo>? SetExifRating5Command { get; set; }
+    public ReactiveCommand<FileInfo> RemoveImageMetaDataCommand { get; set; }
     public ReactiveCommand<FileInfo> SetDateTakenCommand { get; set; }
     public ReactiveCommand<string> SetAuthorsCommand { get; set; }
     public ReactiveCommand<string> SetCopyrightCommand { get; set; }
@@ -616,6 +618,10 @@ public class ExifViewModel : IDisposable
                 }
             }
 
+            // Read UserComment before any other EXIF tag. Magick.NET normalizes the
+            // profile byte order on first access, which legacy Unicode decoding needs.
+            Comment.Value = ExifReader.GetUserComment(profile);
+
             if (profile != null)
             {
                 DpiY.Value = profile.GetValue(ExifTag.YResolution)?.Value.ToDouble() ?? magick.Density.X;
@@ -758,7 +764,6 @@ public class ExifViewModel : IDisposable
             ExifVersion.Value = ExifReader.GetExifVersion(profile);
             LensModel.Value = profile?.GetValue(ExifTag.LensModel)?.Value ?? string.Empty;
             LensMaker.Value = profile?.GetValue(ExifTag.LensMake)?.Value ?? string.Empty;
-            Comment.Value = ExifReader.GetUserComment(profile);
         }
         catch (Exception e)
         {
@@ -776,9 +781,9 @@ public class ExifViewModel : IDisposable
     public void OpenGoogleMaps(Unit unit) => ProcessHelper.OpenLink(GoogleLink.CurrentValue);
     public void OpenBingMaps(Unit unit) => ProcessHelper.OpenLink(BingLink.CurrentValue);
 
-    private async Task<bool> SetRating(string filePath, ushort rating)
+    private async Task<bool> SetRating(FileInfo fileInfo, ushort rating)
     {
-        var isRated = await ExifWriter.SetExifRatingAsync(new FileInfo(filePath), rating).ConfigureAwait(false);
+        var isRated = await ExifWriter.SetExifRatingAsync(fileInfo, rating).ConfigureAwait(false);
         if (!isRated)
         {
             return false;
@@ -802,5 +807,52 @@ public class ExifViewModel : IDisposable
         {
             await addAction(_fileInfo, value);
         }
+    }
+    
+    private async Task RemoveImageMetaData(FileInfo fileInfo)
+    {
+        if (!fileInfo.Exists)
+        {
+            return;
+        }
+        await ExifWriter.RemoveImageMetaData(fileInfo);
+        
+        // Remove UI displayed fields
+        ExifRating.Value = 0;
+        DateTaken.Value = null;
+        Copyright.Value = string.Empty;
+        Authors.Value = string.Empty;
+        Software.Value = string.Empty;
+        Subject.Value = string.Empty;
+        Title.Value = string.Empty;
+        Comment.Value = string.Empty;
+        Latitude.Value = null;
+        Longitude.Value = null;
+        Altitude.Value = null;
+        CompressedBitsPixel.Value = string.Empty;
+        CameraMaker.Value = string.Empty;
+        CameraModel.Value = string.Empty;
+        FNumber.Value = string.Empty;
+        MaxAperture.Value = string.Empty;
+        ExposureBias.Value = string.Empty;
+        ExposureTime.Value = string.Empty;
+        DigitalZoom.Value = string.Empty;
+        FocalLength.Value = string.Empty;
+        FocalLength35Mm.Value = string.Empty;
+        ISOSpeed.Value = string.Empty;
+        MeteringMode.Value = string.Empty;
+        Contrast.Value = string.Empty;
+        Saturation.Value = string.Empty;
+        Sharpness.Value = string.Empty;
+        WhiteBalance.Value = string.Empty;
+        FlashEnergy.Value = string.Empty;
+        FlashMode.Value = string.Empty;
+        LightSource.Value = string.Empty;
+        Brightness.Value = string.Empty;
+        PhotometricInterpretation.Value = string.Empty;
+        LensMaker.Value = string.Empty;
+        LensModel.Value = string.Empty;
+        ExifVersion.Value = string.Empty;
+        DateTaken.Value = null;
     }
 }

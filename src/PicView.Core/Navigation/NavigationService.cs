@@ -38,23 +38,69 @@ public class NavigationService(
         try
         {
             fileWatcherService.Unwatch(tab);
-            fileWatcherService.Watch(tab, fileInfo.DirectoryName);
 
             // Show image quickly to make it feel fast
-            var model = await imageLoader.GetImageModelAsync(fileInfo, ct.Token).ConfigureAwait(false);
-            tab.Model = model; // Image updated via reactive subscription
-            
-            tab.ImageIterator.Files = files ?? FileListRetriever.RetrieveFiles(fileInfo, stringComparer);
-            var index = FindIndex(fileInfo, tab);
-            tab.ImageIterator.SetCurrentIndex(index);
+            ImageModel model;
+            ImageModel? secondaryModel = null;
+            int index;
+            var secondaryIndex = 0;
+            if (cache.TryGet(fileInfo, out var preLoadValue))
+            {
+                model = preLoadValue.ImageModel;
+            }
+            else
+            {
+                model = await imageLoader.GetImageModelAsync(fileInfo, ct.Token).ConfigureAwait(false);
+            }
+            if (Settings.ImageScaling.ShowImageSideBySide)
+            {
+                tab.ImageIterator.Files = files ?? FileListRetriever.RetrieveFiles(fileInfo, stringComparer);
+                index = FindIndex(fileInfo, tab);
+                var (_, nextIteration, _) = IterationHelper.GetIterations(index, tab.ImageIterator.Files.Count, NavigateTo.Next, SkipAmount.None);
+                var secondaryFileInfo = tab.ImageIterator.Files[nextIteration];
+                if (cache.TryGet(secondaryFileInfo, out var secondaryPreLoadValue))
+                {
+                    secondaryModel = secondaryPreLoadValue.ImageModel;
+                }
+                else
+                {
+                    secondaryModel = await imageLoader.GetImageModelAsync(secondaryFileInfo, ct.Token).ConfigureAwait(false);
+                }
+                tab.SecondaryModel = secondaryModel;
+                tab.SecondaryImage.Value = secondaryModel.Image;
+                tab.SecondaryImageType.Value = secondaryModel.ImageType;
+                tab.SecondaryFileInfo.Value = secondaryFileInfo;
+                ShowModel(model);
+                secondaryIndex = nextIteration;
+            }
+            else
+            {
+                ShowModel(model);
+                tab.ImageIterator.Files = files ?? FileListRetriever.RetrieveFiles(fileInfo, stringComparer);
+                index = FindIndex(fileInfo, tab);
+                tab.ImageIterator.SetCurrentIndex(index);
+            }
             
             tab.UpdateTabTitle();
+            fileWatcherService.Watch(tab, fileInfo.DirectoryName);
             cache.Clear(tab.Id);
             cache.Add(tab.Id, index, new PreLoadValue(model), tab.ImageIterator.Files.Count, false);
+            if (secondaryModel is not null)
+            {
+                cache.Add(tab.Id, secondaryIndex, new PreLoadValue(model), tab.ImageIterator.Files.Count, false);
+            }
             cache.Preload(tab.Id, index, false, tab.ImageIterator.Files, tab.GetTabCancellation().Token);
+            FileHistoryManager.Add(fileInfo.FullName);
 
             if ((tab.Gallery.IsDockedGalleryVisible.CurrentValue || tab.Gallery.IsGalleryExpanded.CurrentValue) && tab.ThumbnailCache != null)
             {
+                if (tab.Gallery.LoadingState is GalleryLoadingState.Loading or GalleryLoadingState.Loaded)
+                {
+                    await ct.CancelAsync();
+                    tab.ResetNavigationCts();
+                    await GalleryLoader.ReloadGallery(tab, tab.ImageIterator.Files, thumbnailLoader, tab.ThumbnailCache, tab.GetTabCancellation().Token).ConfigureAwait(false);
+                    return;
+                }
                 tab.Gallery.LoadingState = GalleryLoadingState.NotLoaded;
                 await GalleryLoader.LoadGalleryAsync(tab, tab.ImageIterator.Files, thumbnailLoader, tab.ThumbnailCache, ct.Token).ConfigureAwait(false);
             }
@@ -62,6 +108,16 @@ public class NavigationService(
         catch (Exception e)
         {
             DebugHelper.LogDebug(nameof(NavigationService), nameof(RepopulateIterator), e);
+        }
+        
+        return;
+
+        void ShowModel(ImageModel model)
+        {
+            tab.Model = model; // Image updated via reactive subscription
+            tab.FileInfo.Value = model.FileInfo;
+            tab.Image.Value = model.Image;
+            tab.ImageType.Value = model.ImageType;
         }
     }
 
@@ -80,23 +136,32 @@ public class NavigationService(
         }
         var iterator = tab.ImageIterator;
 
-        if (iterator.Files is null || iterator.Files.Count == 0)
+        if (iterator.Files is null || iterator.Files.Count is 0)
         {
+            // TODO: Figure out way to share file list, if another tab is already in the same directory
             await Repopulate();
             return;
         }
 
         var index = FindIndex(fileInfo, tab);
         if (index is not -1)
-        {            
-            await tab.ImageIterator.IterateToIndexAsync(index, ct).ConfigureAwait(false);
+        {
+            if (Settings.ImageScaling.ShowImageSideBySide)
+            {
+                var (_, nextIteration, _) = IterationHelper.GetIterations(index, tab.ImageIterator.Files.Count, NavigateTo.Next, SkipAmount.None);
+                await tab.ImageIterator.IterateToIndicesAsync(index, nextIteration, ct).ConfigureAwait(false);
+            }
+            else
+            {
+                await tab.ImageIterator.IterateToIndexAsync(index, ct).ConfigureAwait(false);
+            }
         }
         else
         {
             await Repopulate();
         }
         
-        ArchiveExtraction.Cleanup();
+        tab.ArchiveExtractionService.Cleanup();
 
         return;
 
@@ -116,7 +181,7 @@ public class NavigationService(
 
         var first = files[0];
         await RepopulateIterator(first, tab, ct, files).ConfigureAwait(false);
-        ArchiveExtraction.Cleanup();
+        tab.ArchiveExtractionService.Cleanup();
     }
 
     public async ValueTask<bool> LoadFromStringAsync(string source, TabViewModel tab, CancellationTokenSource ct)
@@ -161,16 +226,16 @@ public class NavigationService(
         {
             return false;
         }
+        
+        // Retrieve the temporary directory for the possible previous archive extraction
+        var tempZipDir = tab.ArchiveExtractionService.TempZipDirectory;
 
-        // Clean up any previous archive extraction before opening a new one
-        ArchiveExtraction.Cleanup();
-
-        var preparation = await ArchiveExtraction.PrepareArchiveAsync(
+        var preparation = await tab.ArchiveExtractionService.PrepareArchiveAsync(
             archivePath,
             platformService.ExtractWithLocalSoftwareAsync,
             stringComparer).ConfigureAwait(false);
 
-        if (preparation is null || string.IsNullOrEmpty(ArchiveExtraction.TempZipDirectory))
+        if (preparation is null || string.IsNullOrEmpty(tab.ArchiveExtractionService.TempZipDirectory))
         {
             return false;
         }
@@ -188,7 +253,7 @@ public class NavigationService(
             // from the already-extracted paths so we don't depend on FileListRetriever's
             // recursion settings.
             var allFiles = prep.EntryKeys.Select(p => new FileInfo(p)).ToList();
-            if (allFiles.Count == 0)
+            if (allFiles.Count is 0)
             {
                 return false;
             }
@@ -202,28 +267,44 @@ public class NavigationService(
         // Staged extraction: extract the first entry, navigate to it, then extract the rest in
         // the background while FileWatcherService inserts each new file into the iterator.
         var firstKey = prep.EntryKeys[0];
-        var firstPath = await ArchiveExtraction.ExtractEntryAsync(archivePath, firstKey, ct.Token).ConfigureAwait(false);
+        var firstPath = await tab.ArchiveExtractionService.ExtractEntryAsync(archivePath, firstKey, ct.Token).ConfigureAwait(false);
 
         if (string.IsNullOrEmpty(firstPath) || ct.IsCancellationRequested)
         {
             return false;
         }
 
-        // Seed the iterator with just the first extracted file. Watching the temp directory
-        // first ensures every subsequent file creation event is captured by FileWatcherService
-        // and inserted in sorted order into the iterator/gallery.
-        var seedFiles = new List<FileInfo> { new(firstPath) };
-        await RepopulateIterator(seedFiles[0], tab, ct, seedFiles).ConfigureAwait(false);
+        if (Settings.ImageScaling.ShowImageSideBySide && prep.EntryKeys.Length > 1)
+        {
+            var secondKey = prep.EntryKeys[1];
+            var secondPath = await tab.ArchiveExtractionService.ExtractEntryAsync(archivePath, secondKey, ct.Token).ConfigureAwait(false);
+            var seedFiles = new List<FileInfo>
+            {
+                new(firstPath),
+                new(secondPath)
+            };
+            await RepopulateIterator(seedFiles[0], tab, ct, seedFiles).ConfigureAwait(false);
+        }
+        else
+        {
+            // Seed the iterator with just the first extracted file. Watching the temp directory
+            // first ensures every subsequent file creation event is captured by FileWatcherService
+            // and inserted in sorted order into the iterator/gallery.
+            var seedFiles = new List<FileInfo> { new(firstPath) };
+            await RepopulateIterator(seedFiles[0], tab, ct, seedFiles).ConfigureAwait(false);
+        }
+
 
         // Kick off background extraction of remaining entries. FileWatcherService picks them up.
         if (prep.EntryKeys.Length > 1)
         {
             var remainingKeys = prep.EntryKeys.Skip(1).ToArray();
             var backgroundToken = tab.GetTabCancellation().Token;
-            _ = Task.Run(() => ArchiveExtraction.ExtractRemainingAsync(archivePath, remainingKeys, backgroundToken), backgroundToken);
+            _ = Task.Run(() => tab.ArchiveExtractionService.ExtractRemainingAsync(archivePath, remainingKeys, backgroundToken), backgroundToken);
         }
 
         FileHistoryManager.Add(archivePath);
+        tab.ArchiveExtractionService.Cleanup(tempZipDir);
         return true;
     }
 
@@ -265,7 +346,7 @@ public class NavigationService(
             tab.CanNavigateBackwards.Value = false;
             tab.CanNavigateForwards.Value = false;
 
-            ArchiveExtraction.Cleanup();
+            tab.ArchiveExtractionService.Cleanup();
         }
         catch (Exception e)
         {
@@ -324,7 +405,7 @@ public class NavigationService(
             tab.CanNavigateForwards.Value = false;
 
             FileHistoryManager.Add(url);
-            ArchiveExtraction.Cleanup();
+            tab.ArchiveExtractionService.Cleanup();
         }
         catch (Exception e)
         {
@@ -335,20 +416,8 @@ public class NavigationService(
         }
     }
 
-    public async ValueTask NavigateAsync(TabViewModel tab, NavigateTo to, CancellationTokenSource ct)
-    {
-        if (!CanNavigate(tab))
-        {
-            return;
-        }
-
-        if (tab.ImageIterator is null)
-        {
-            return;
-        }
-        
+    public async ValueTask NavigateAsync(TabViewModel tab, NavigateTo to, CancellationTokenSource ct) =>
         await tab.ImageIterator.NavigateAsync(to, SkipAmount.One, ct).ConfigureAwait(false);
-    }
 
     public async ValueTask NavigateByIncrementsAsync(TabViewModel tab, SkipAmount skipAmount, bool forwards, CancellationTokenSource ct)
     {
@@ -375,8 +444,6 @@ public class NavigationService(
         await LoadFromStringAsync(fileToLoad, tab, ct).ConfigureAwait(false);
         return true;
     }
-
-    public bool CanNavigate(TabViewModel tab) => tab?.ImageIterator?.Files?.Count > 0;
 
     public async ValueTask NavigateToNextFolderAsync(TabViewModel tab, CancellationTokenSource ct)
     {
@@ -417,8 +484,8 @@ public class NavigationService(
 
     private async ValueTask NavigateArchiveCoreAsync(TabViewModel tab, bool next, CancellationTokenSource ct)
     {
-        var currentFile = ArchiveExtraction.IsArchived ?
-            new FileInfo(ArchiveExtraction.LastOpenedArchive) : tab.Model.FileInfo;
+        var currentFile = tab.ArchiveExtractionService.IsArchived ?
+            new FileInfo(tab.ArchiveExtractionService.LastOpenedArchive) : tab.Model.FileInfo;
            
         var currentDir = currentFile?.DirectoryName;
         if (currentDir == null)
@@ -448,7 +515,7 @@ public class NavigationService(
 
     private async ValueTask ApplySortAsync(TabViewModel tab, CancellationTokenSource ct)
     {
-        if (!CanNavigate(tab))
+        if (tab.ImageIterator.Files.Count <= 0)
         {
             return;
         }

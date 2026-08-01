@@ -13,7 +13,7 @@ public static class WindowsKeybindings
                                                "F6": "EffectsWindow",
                                                "F7": "BatchResizeWindow",
                                                "F10": "ToggleInterface",
-                                               "F11": "Fullscreen",
+                                               "F11": "ToggleFullscreen",
                                                "W": "Up",
                                                "E": "GalleryClick",
                                                "Enter": "GalleryClick",
@@ -73,15 +73,19 @@ public static class WindowsKeybindings
                                                "OemMinus": "ZoomOut",
                                                "Delete": "DeleteFile",
                                                "Shift+Delete": "DeleteFilePermanently",
-                                               "Alt+Enter": "Fullscreen",
+                                               "Alt+Enter": "ToggleFullscreen",
                                                "Ctrl+F": "Search",
+                                               "Ctrl+PageUp": "NextArchive",
+                                               "Ctrl+PageDown": "PrevArchive",
                                                "Ctrl+PageUp": "NextArchive",
                                                "Ctrl+PageDown": "PrevArchive",
                                                "D1": "Label:red",
                                                "D2": "Label:green",
                                                "D3": "Label:blue",
                                                "D4": "Label:yellow",
-                                               "D0": "ClearLabel"
+                                               "D0": "ClearLabel",
+                                               "Ctrl+T": "NewTab",
+                                               "Ctrl+W": "CloseTab",
                                                }
                                                """;
 }

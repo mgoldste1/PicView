@@ -18,5 +18,6 @@ public static class ViewChangeHelper
         {
             tab.CurrentView.Value = new StartUpMenu();
         });
+        vm.IsLoadingIndicatorShown.Value = false;
     }
 }

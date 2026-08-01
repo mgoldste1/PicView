@@ -23,29 +23,22 @@ public class TiffNavigationTests : IDisposable
     {
         ObservableSystem.DefaultFrameProvider = new MockFrameProvider();
 
-        SettingsManager.SetDefaults();
+        SetDefaults();
         TranslationManager.Init();
+        Settings.Navigation.IsFileHistoryEnabled = false;
+
+        _files =
+        [
+            new FileInfo("file0.jpg"),
+            new FileInfo("file1.tiff"),
+            new FileInfo("file2.png")
+        ];
 
         _cache = new MockImageCache();
         _mockThumbnailCache = new MockThumbnailCache();
-        _tab = new TabViewModel("test", null);
-        _tab.Initialize(_cache, _mockThumbnailCache, new MockThumbnailLoader());
-        
-        // Setup 3 files
-        _files = new List<FileInfo>
-        {
-            new("file0.jpg"),
-            new("file1.tif"), // Will be mocked as multi-page TIFF
-            new("file2.jpg")
-        };
-
+        _tab = new TabViewModel(_ => { });
         _iterator = new ImageIterator(_cache, _mockThumbnailCache, new MockThumbnailLoader(), _tab);
-        // Avoid Initialize to prevent R3 Polling (EveryValueChanged) which requires FrameProvider
-        _iterator.Files = _files;
-        _iterator.SetCurrentIndex(0);
-        
-        // Ensure Tab Model is initialized for index 0
-        _tab.Model = new ImageModel { FileInfo = _files[0] };
+        _iterator.Initialize(_files);
     }
 
     [Fact]
@@ -57,9 +50,10 @@ public class TiffNavigationTests : IDisposable
         // Mock the TIFF model for Index 1
         var tiffModel = CreateTiffModel(_files[1], 3); // 3 pages
         _cache.SetModel(1, tiffModel);
+        _tab.Model = new ImageModel();
 
         // Act: Navigate Next (0 -> 1)
-        await _iterator.IterateToIndexAsync(1, new CancellationTokenSource());
+        await _iterator.NavigateAsync(NavigateTo.Next, SkipAmount.One, new CancellationTokenSource());
 
         // Assert
         Assert.Equal(1, _iterator.CurrentIndex);
@@ -79,7 +73,7 @@ public class TiffNavigationTests : IDisposable
         _cache.SetModel(1, tiffModel);
 
         // Act: Navigate Prev (2 -> 1)
-        await _iterator.IterateToIndexAsync(1, new CancellationTokenSource());
+        await _iterator.NavigateAsync(NavigateTo.Previous, SkipAmount.One, new CancellationTokenSource());
 
         // Assert
         Assert.Equal(1, _iterator.CurrentIndex);
@@ -99,7 +93,7 @@ public class TiffNavigationTests : IDisposable
         _cache.SetModel(1, tiffModel); // Cache should return same model
 
         // Act: Navigate Next (Target would be 2 normally)
-        await _iterator.IterateToIndexAsync(2, new CancellationTokenSource());
+        await _iterator.NavigateAsync(NavigateTo.Next, SkipAmount.One, new CancellationTokenSource());
 
         // Assert
         Assert.Equal(1, _iterator.CurrentIndex); // Should stay on 1
@@ -120,7 +114,7 @@ public class TiffNavigationTests : IDisposable
         _cache.SetModel(2, nextModel);
 
         // Act: Navigate Next (Target 2)
-        await _iterator.IterateToIndexAsync(2, new CancellationTokenSource());
+        await _iterator.NavigateAsync(NavigateTo.Next, SkipAmount.One, new CancellationTokenSource());
 
         // Assert
         Assert.Equal(2, _iterator.CurrentIndex); // Moved to 2
@@ -139,7 +133,7 @@ public class TiffNavigationTests : IDisposable
         _cache.SetModel(1, tiffModel);
 
         // Act: Navigate Prev (Target 0)
-        await _iterator.IterateToIndexAsync(0, new CancellationTokenSource());
+        await _iterator.NavigateAsync(NavigateTo.Previous, SkipAmount.One, new CancellationTokenSource());
 
         // Assert
         Assert.Equal(1, _iterator.CurrentIndex); // Stay on 1
@@ -160,7 +154,7 @@ public class TiffNavigationTests : IDisposable
         _cache.SetModel(0, prevModel);
 
         // Act: Navigate Prev (Target 0)
-        await _iterator.IterateToIndexAsync(0, new CancellationTokenSource());
+        await _iterator.NavigateAsync(NavigateTo.Previous, SkipAmount.One, new CancellationTokenSource());
 
         // Assert
         Assert.Equal(0, _iterator.CurrentIndex); // Moved to 0
@@ -188,7 +182,7 @@ public class TiffNavigationTests : IDisposable
 
     public void Dispose()
     {
-        _iterator.Dispose();
+        
     }
 
     // Mocks
@@ -199,7 +193,7 @@ public class TiffNavigationTests : IDisposable
 
         public void SetModel(int index, ImageModel model) => _models[index] = model;
 
-        public Task<ImageModel?> LoadAsync(string ownerId, int index, IReadOnlyList<FileInfo> list, CancellationToken ct = default)
+        public Task<ImageModel?> LoadAsync(uint ownerId, int index, IReadOnlyList<FileInfo> list, CancellationToken ct = default)
         {
             if (_models.TryGetValue(index, out var model))
                 return Task.FromResult<ImageModel?>(model);
@@ -207,16 +201,65 @@ public class TiffNavigationTests : IDisposable
         }
 
         public bool TryGet(FileInfo f, out PreLoadValue? value) { value = null; return false; }
+        public bool TryGet(uint ownerId, int index, out PreLoadValue? value)
+        {
+            value = null; return false;
+        }
+
         public bool TryGet(string ownerId, int index, out PreLoadValue? value) { value = null; return false; }
         public void Clear() { }
+        public void Clear(uint ownerId)
+        {
+            throw new NotImplementedException();
+        }
+
         public void Clear(string ownerId) { }
         public bool Contains(PreLoadValue value) => false;
+        public void Add(uint ownerId, int index, PreLoadValue preLoadValue, int listCount, bool isReverse)
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool TryAdd(uint ownerId, int index, PreLoadValue preLoadValue, int listCount, bool isReverse, out PreLoadValue? value)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void Preload(uint ownerId, int currentIndex, bool reversed, IReadOnlyList<FileInfo> files, CancellationToken token)
+        {
+        }
+
+        public void RemoveOwner(uint ownerId)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void RegisterOwner(uint ownerId)
+        {
+            throw new NotImplementedException();
+        }
+
         public bool Add(string ownerId, int index, PreLoadValue preLoadValue, int listCount, bool isReverse) => false;
         public bool TryAdd(string ownerId, int index, PreLoadValue preLoadValue, int listCount, bool isReverse, out PreLoadValue? value) { value = null; return false; }
         public void Preload(string ownerId, int currentIndex, bool reversed, IReadOnlyList<FileInfo> files, CancellationToken token) { }
         public void RemoveOwner(string ownerId) { }
         public void RegisterOwner(string ownerId) { }
-        public void Clear(TabViewModel tab, int currentIndex, string directory, IReadOnlyList<FileInfo> files) { }
+        public void Clear(TabViewModel tab, string directory) { }
+        public void TryRemove(uint ownerId, int index)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void Resynchronize(uint ownerId, IReadOnlyList<FileInfo> files)
+        {
+            throw new NotImplementedException();
+        }
+
+        public ValueTask<bool> WaitForLoadingCompleteAsync(uint ownerId, int index, IReadOnlyList<FileInfo> list, CancellationToken ct = default)
+        {
+            return ValueTask.FromResult(true);
+        }
+
         public void TryRemove(string ownerId, int index) { }
         public void EvictPath(string fullPath) { }
         public void Resynchronize(string ownerId, IReadOnlyList<FileInfo> files) { }

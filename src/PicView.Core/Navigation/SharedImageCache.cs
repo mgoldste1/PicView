@@ -10,7 +10,7 @@ namespace PicView.Core.Navigation;
 /// Acts as the central station for acquiring and managing cached <see cref="ImageModel"/> resources.
 /// <para>
 /// This class coordinates between the storage container (multiple <see cref="EvictingDictionary{TValue}"/>) 
-/// and the background worker (<see cref="Preloader2"/>) to ensure images are loaded, retrieved, 
+/// and the background worker (<see cref="Preloader"/>) to ensure images are loaded, retrieved, 
 /// and evicted efficiently across multiple tab owners.
 /// </para>
 /// </summary>
@@ -36,9 +36,7 @@ public class SharedImageCache : IImageCache
     private readonly ConcurrentDictionary<uint, (string Directory, IReadOnlyList<FileInfo> Files, int CurrentIndex)> _ownerContexts = new();
     
     // The worker
-    private readonly Preloader2 _preLoader;
-    
-    private readonly Lock _disposeLock = new();
+    private readonly Preloader _preLoader;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SharedImageCache"/> class.
@@ -53,7 +51,7 @@ public class SharedImageCache : IImageCache
         _pathLookup = new ConcurrentDictionary<string, PreLoadValue>(pathComparer);
         _disposalList = new ConcurrentDictionary<string, (PreLoadValue, DateTime)>(pathComparer);
 
-        _preLoader = new Preloader2(imageLoader, this);
+        _preLoader = new Preloader(imageLoader, this);
     }
 
     #region Resynchronize and owner registration
@@ -100,7 +98,7 @@ public class SharedImageCache : IImageCache
         // Remove and dispose any pending-disposal entry so it cannot be resurrected
         if (_disposalList.TryRemove(fullPath, out var pending))
         {
-            DisposeHelper(pending.Item);
+            pending.Item.ImageModel.Dispose();
         }
     }
 
@@ -160,9 +158,9 @@ public class SharedImageCache : IImageCache
 
     #region Add, Get, Remove, and Clear
     
-    public bool Add(uint ownerId, int index, PreLoadValue preLoadValue, int listCount, bool isReverse)
+    public void Add(uint ownerId, int index, PreLoadValue preLoadValue, int listCount, bool isReverse)
     {
-        return TryAdd(ownerId, index, preLoadValue, listCount, isReverse, out _);
+        TryAdd(ownerId, index, preLoadValue, listCount, isReverse, out _);
     }
 
     public bool TryAdd(uint ownerId, int index, PreLoadValue preLoadValue, int listCount, bool isReverse, out PreLoadValue? value)
@@ -239,10 +237,15 @@ public class SharedImageCache : IImageCache
             return;
         }
 
-        if (removedValue != null)
+        if (removedValue == null)
         {
-            CheckAndDisposeIfNotReferenced(removedValue);
+            return;
         }
+        if (removedValue.ImageModel.Image is IDisposable disposable)
+        {
+            disposable.Dispose();
+        }
+        removedValue.ImageModel.Image = null;
     }
 
     public void Clear()
@@ -255,9 +258,9 @@ public class SharedImageCache : IImageCache
         
         foreach (var kvp in _disposalList)
         {
-            DisposeHelper(kvp.Value.Item);
+            kvp.Value.Item.ImageModel.Dispose();
         }
-        _disposalList.Clear();
+        ForceDisposalQueue();
     }
 
     public void Clear(uint ownerId)
@@ -269,14 +272,16 @@ public class SharedImageCache : IImageCache
 
         var values = dict.Values.ToList();
         dict.Clear();
+        _pathLookup.Clear();
             
         foreach (var value in values)
         {
-            CheckAndDisposeIfNotReferenced(value);
+            value.ImageModel.Dispose();
         }
+        ForceDisposalQueue();
     }
 
-    public void Clear(TabViewModel tab, int currentIndex, string directory, IReadOnlyList<FileInfo> files)
+    public void Clear(TabViewModel tab, string directory)
     {
         var id = tab.Id;
         
@@ -356,26 +361,24 @@ public class SharedImageCache : IImageCache
 
     #region Loading, preloading and wait for loading
 
-    public async Task<ImageModel?> LoadAsync(uint ownerId, int index, IReadOnlyList<FileInfo> list, CancellationToken ct = default)
-    {
-        return await _preLoader.AddAsync(ownerId, index, list, false, ct).ConfigureAwait(false);
-    }
+    public async Task<ImageModel?> LoadAsync(uint ownerId, int index, IReadOnlyList<FileInfo> list, CancellationToken ct = default) =>
+        await _preLoader.AddAsync(ownerId, index, list, false, ct).ConfigureAwait(false);
 
-    public void Preload(uint ownerId, int currentIndex, bool reversed, IReadOnlyList<FileInfo> files, CancellationToken token) 
-    {
-        // Update context for transfer logic
-        if (files.Count > 0)
-        {
-            _ownerContexts[ownerId] = (files[0].DirectoryName ?? string.Empty, files, currentIndex);
-        }
+    public void Preload(uint ownerId, int currentIndex, bool reversed, IReadOnlyList<FileInfo> files, CancellationToken token) =>
         _preLoader.Preload(ownerId, currentIndex, reversed, files, token);
-    }
 
-    public async ValueTask<bool> WaitForLoadingCompleteAsync(uint ownerId, int index)
+    public async ValueTask<bool> WaitForLoadingCompleteAsync(uint ownerId, int index, IReadOnlyList<FileInfo> list, CancellationToken ct = default)
     {
-        if (!TryGet(ownerId, index, out var value) || value is null)
+        if (!TryGet(list[index], out var value))
         {
             return false;
+        }
+
+        if (value is null)
+        {
+            var model = await LoadAsync(ownerId, index, list, ct);
+            Add(ownerId, index, new PreLoadValue(model), list.Count, false);
+            return true;
         }
 
         await value.WaitForLoadingCompleteAsync();
@@ -445,7 +448,7 @@ public class SharedImageCache : IImageCache
             {
                 if (_disposalList.TryRemove(kvp.Key, out var removed))
                 {
-                    DisposeHelper(removed.Item);
+                    removed.Item.ImageModel.Dispose();
                 }
             }
         }
@@ -457,26 +460,8 @@ public class SharedImageCache : IImageCache
         {
             if (_disposalList.TryRemove(kvp.Key, out var removed))
             {
-                DisposeHelper(removed.Item);
+                removed.Item.ImageModel.Dispose();
             }
-        }
-    }
-
-    private void DisposeHelper(PreLoadValue? item)
-    {
-        if (item?.ImageModel?.Image is not IDisposable disposable)
-        {
-            return;
-        }
-
-        _disposeLock.Enter();
-        try
-        {
-            disposable.Dispose();
-        }
-        finally
-        {
-            _disposeLock.Exit();
         }
     }
 

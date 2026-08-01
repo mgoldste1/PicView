@@ -214,6 +214,8 @@ public class UIProperties
     /// 0 => None, 1 => Reset zoom, 2 => Toggle fullscreen
     /// </summary>
     public int DoubleClickBehavior { get; set; } = 1;
+    
+    public bool ShowFullPathInTitleBar { get; set; } = false;
 }
 
 public class Theme
@@ -226,7 +228,7 @@ public class Theme
     /// <summary>
     /// Represents the color theme configuration setting, which determines the accent and primary colors used in the application.
     /// </summary>
-    public int ColorTheme { get; set; } = 3;
+    public int ColorTheme { get; set; } = 4;
     // Not used yet...
     public bool UseSystemTheme { get; set; } = false;
 
@@ -482,6 +484,12 @@ public class LabelSettings
     public RelabelPolicy RelabelPolicy { get; set; } = RelabelPolicy.Replace;
 
     /// <summary>
+    /// Controls behavior when the same label already on the file is applied again
+    /// (e.g. an image labeled "yellow" and the user taps "yellow" again).
+    /// </summary>
+    public SameLabelPolicy SameLabelPolicy { get; set; } = SameLabelPolicy.Remove;
+
+    /// <summary>
     /// The separator pattern between the filename stem and the label text.
     /// May contain {LABEL} placeholder for template mode (e.g. "_({LABEL})").
     /// If no placeholder, the label is appended after the separator: stem + separator + label.
@@ -510,6 +518,18 @@ public enum RelabelPolicy
     Block = 1,
     /// <summary>Show a confirmation dialog asking the user whether to replace.</summary>
     Prompt = 2
+}
+
+/// <summary>
+/// Defines behavior when the user applies the same label that is already on the file
+/// (tapping the current label again).
+/// </summary>
+public enum SameLabelPolicy
+{
+    /// <summary>Remove the label and stay on the current image.</summary>
+    Remove = 0,
+    /// <summary>Keep the label and, if auto-advance is enabled, move to the next image.</summary>
+    KeepAndAdvance = 1
 }
 
 /// <summary>

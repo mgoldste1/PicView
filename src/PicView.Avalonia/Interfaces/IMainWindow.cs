@@ -16,5 +16,5 @@ public interface IMainWindow
     
     MainTitleBar? SharedTitleBar { get; set; }
     
-    AvaloniaRenderingFrameProvider? FrameProvider { get; set; }
+    AvaloniaRenderingFrameProvider FrameProvider { get; set; }
 }

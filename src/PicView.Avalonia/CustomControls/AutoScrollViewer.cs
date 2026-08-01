@@ -210,7 +210,6 @@ public class AutoScrollViewer : ScrollViewer
         var autoScrollSign = e.NameScope.Find<AutoScrollSign>("PART_AutoScrollSign");
 
         _autoScrollingSubject
-            .ObserveOn(UIHelper.GetFrameProvider)
             .Subscribe(isAutoScrolling =>
             {
                 var canScroll = CanScroll();
@@ -301,7 +300,6 @@ public class AutoScrollViewer : ScrollViewer
 
         Observable.Interval(TimeSpan.FromMilliseconds(16))
             .TakeUntil(_autoScrollingSubject.Where(isScrolling => !isScrolling))
-            .ObserveOn(UIHelper.GetFrameProvider)
             .Subscribe(_ => PerformAutoScroll())
             .AddTo(_disposables);
     }

@@ -15,6 +15,8 @@ public partial class LabelingView : UserControl
 
     private readonly ObservableCollection<LabelCategoryItem> _categories = new();
 
+    private bool _isSyncingClearLabelKey;
+
     public LabelingView()
     {
         InitializeComponent();
@@ -30,6 +32,7 @@ public partial class LabelingView : UserControl
         if (KeybindingManager.CustomShortcuts is null)
         {
             RefreshAvailableKeys();
+            SyncClearLabelKeySelection();
             return;
         }
 
@@ -44,6 +47,7 @@ public partial class LabelingView : UserControl
         }
 
         RefreshAvailableKeys();
+        SyncClearLabelKeySelection();
     }
 
     private void RefreshAvailableKeys()
@@ -235,6 +239,79 @@ public partial class LabelingView : UserControl
         catch (Exception exception)
         {
             DebugHelper.LogDebug(nameof(LabelingView), nameof(CommitRename), exception);
+        }
+    }
+
+    private static KeyGesture DigitZeroGesture => KeyGesture.Parse("D0");
+
+    private static KeyGesture BacktickGesture => KeyGesture.Parse("OemTilde");
+
+    private static bool IsClearLabelBoundTo(KeyGesture gesture)
+    {
+        return KeybindingManager.CustomShortcuts is not null &&
+               KeybindingManager.CustomShortcuts.TryGetValue(gesture, out var action) &&
+               string.Equals(action, "ClearLabel", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void SyncClearLabelKeySelection()
+    {
+        if (ClearLabelKeyComboBox is null)
+        {
+            return;
+        }
+
+        _isSyncingClearLabelKey = true;
+        try
+        {
+            // Default to "0" (index 0); select backtick (index 1) if that gesture is bound to ClearLabel.
+            ClearLabelKeyComboBox.SelectedIndex = IsClearLabelBoundTo(BacktickGesture) ? 1 : 0;
+        }
+        finally
+        {
+            _isSyncingClearLabelKey = false;
+        }
+    }
+
+    private async void OnClearLabelKeyChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_isSyncingClearLabelKey)
+        {
+            return;
+        }
+
+        try
+        {
+            if (KeybindingManager.CustomShortcuts is null)
+            {
+                return;
+            }
+
+            var useBacktick = ClearLabelKeyComboBox.SelectedIndex == 1;
+            var newGesture = useBacktick ? BacktickGesture : DigitZeroGesture;
+            var oldGesture = useBacktick ? DigitZeroGesture : BacktickGesture;
+
+            // Only allow assigning the new gesture if it is free or already used by ClearLabel.
+            if (KeybindingManager.CustomShortcuts.TryGetValue(newGesture, out var existingAction) &&
+                !string.Equals(existingAction, "ClearLabel", StringComparison.OrdinalIgnoreCase))
+            {
+                ShowMessage("That key is already used by another action.");
+                SyncClearLabelKeySelection();
+                return;
+            }
+
+            // Remove any existing ClearLabel binding, then set the chosen one.
+            if (IsClearLabelBoundTo(oldGesture))
+            {
+                KeybindingManager.CustomShortcuts.Remove(oldGesture);
+            }
+
+            KeybindingManager.CustomShortcuts[newGesture] = "ClearLabel";
+            await KeybindingManager.UpdateKeyBindingsFile().ConfigureAwait(true);
+            HideMessage();
+        }
+        catch (Exception exception)
+        {
+            DebugHelper.LogDebug(nameof(LabelingView), nameof(OnClearLabelKeyChanged), exception);
         }
     }
 

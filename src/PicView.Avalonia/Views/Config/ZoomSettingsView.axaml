@@ -21,6 +21,19 @@
                                        Mode=OneWay}" />
         </StackPanel>
 
+        <!--  Zoom to fit  -->
+        <Border ui:SearchProperties.Keywords="{CompiledBinding SettingsViewModel.SearchData.ImageZoomToFitSearchTags}" Classes="searchBorder">
+            <customControls:TextToggleButton
+                x:Name="ZoomToFitToggleButton"
+                Classes="altHover settingsToggleButton"
+                Command="{Binding MainWindows.ActiveWindow.Value.ZoomToFitCommand}"
+                IsChecked="{Binding MainWindows.ActiveWindow.Value.IsZoomedToFit.Value, Mode=TwoWay}"
+                Text="{CompiledBinding Translation.ZoomToFit.Value,
+                                       Mode=OneWay}"
+                ToolTip.Tip="{CompiledBinding Translation.ZoomToFit.Value,
+                                              Mode=OneWay}" />
+        </Border>
+
         <Border ui:SearchProperties.Keywords="{CompiledBinding SettingsViewModel.SearchData.ZoomResetSearchTags}" Classes="searchBorder">
             <customControls:TextToggleButton
                 x:Name="ResetZoomToggleButton"

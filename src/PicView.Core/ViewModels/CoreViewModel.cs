@@ -25,7 +25,9 @@ public class CoreViewModel(
     public EffectsViewModel? Effects { get; set; }
     public BatchResizeViewModel? BatchResize { get; set; }
     public FileHistoryViewModel? FileHistory { get; set; }
-
+    
+    public FileAssociationsViewModel? AssociationsViewModel { get; set; }
+    
     // --- Overview models ---
     public MainWindowOverviewViewModel MainWindows { get; } = new();
 }

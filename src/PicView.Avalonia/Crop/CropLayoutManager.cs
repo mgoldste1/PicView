@@ -1,5 +1,6 @@
 ﻿using Avalonia;
 using Avalonia.Controls;
+using PicView.Avalonia.CustomControls;
 using PicView.Avalonia.Views.UC;
 using PicView.Avalonia.WindowBehavior;
 using PicView.Core.DebugTools;
@@ -27,7 +28,11 @@ public class CropLayoutManager(CropControl control)
         double imageWidth, imageHeight;
         if (double.IsNaN(vm.ImageWidth.CurrentValue) || double.IsNaN(vm.ImageHeight.CurrentValue))
         {
-            var size = WindowResizing.GetSize(vm);
+            if (TopLevel.GetTopLevel(control) is not MainWindow mainWindow)
+            {
+                return;
+            }
+            var size = WindowResizing.GetSize(mainWindow, vm);
             if (!size.HasValue)
             {
                 return;

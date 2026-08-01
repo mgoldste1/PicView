@@ -22,9 +22,36 @@ public static class LabelHelper
     private const string FilenamePlaceholder = "{FILENAME}";
 
     /// <summary>
+    /// Guards against a held-down or double-tapped label key applying to files that
+    /// load after an auto-advance. While a label operation (rename + advance) is in
+    /// flight, additional label/clear requests are ignored so the newly loaded image
+    /// isn't labeled by leftover key repeats. Reset once the operation completes, so a
+    /// deliberate press afterwards (including re-marking the last image) still works.
+    /// </summary>
+    private static int _labelInFlight;
+
+    /// <summary>
     /// Applies a label to the current image. Handles replace, toggle-off, and advance logic.
     /// </summary>
     public static async Task ApplyLabelAsync(MainWindowViewModel vm, string label)
+    {
+        // Drop the request if a label operation is already running (held/double-tapped key).
+        if (Interlocked.CompareExchange(ref _labelInFlight, 1, 0) != 0)
+        {
+            return;
+        }
+
+        try
+        {
+            await ApplyLabelCoreAsync(vm, label);
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _labelInFlight, 0);
+        }
+    }
+
+    private static async Task ApplyLabelCoreAsync(MainWindowViewModel vm, string label)
     {
         var tab = vm.WindowTabs?.ActiveTab?.CurrentValue;
         if (tab?.FileInfo?.CurrentValue is null)
@@ -57,6 +84,24 @@ public static class LabelHelper
     /// Removes any known label from the current file without advancing.
     /// </summary>
     public static async Task ClearLabelAsync(MainWindowViewModel vm)
+    {
+        // Drop the request if a label operation is already running (held/double-tapped key).
+        if (Interlocked.CompareExchange(ref _labelInFlight, 1, 0) != 0)
+        {
+            return;
+        }
+
+        try
+        {
+            await ClearLabelCoreAsync(vm);
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _labelInFlight, 0);
+        }
+    }
+
+    private static async Task ClearLabelCoreAsync(MainWindowViewModel vm)
     {
         var tab = vm.WindowTabs?.ActiveTab?.CurrentValue;
         if (tab?.FileInfo?.CurrentValue is null)
@@ -131,9 +176,20 @@ public static class LabelHelper
         var cleanStem = StripLabelFromStem(stem, settings);
         var currentLabel = GetCurrentLabel(stem, settings);
 
-        // Toggle-off: same label pressed → remove it, stay on current image
+        // Toggle-off: same label pressed again
         if (string.Equals(currentLabel, label, StringComparison.OrdinalIgnoreCase))
         {
+            // Keep the label in place and advance if configured
+            if (settings.SameLabelPolicy == SameLabelPolicy.KeepAndAdvance)
+            {
+                if (settings.AutoAdvanceAfterLabel)
+                {
+                    await vm.WindowTabs.NavigateDirectionalAsync(false, NavigateTo.Next).ConfigureAwait(false);
+                }
+                return;
+            }
+
+            // Remove the label, stay on current image
             var newName = cleanStem + ext;
             var newPath = Path.Combine(directory, newName);
 
@@ -145,7 +201,7 @@ public static class LabelHelper
 
             await PerformRenameAsync(tab, oldPath, newPath, vm);
             TooltipHelper.ShowTooltipMessage($"Label '{label}' removed");
-            return; // Do NOT advance on toggle-off
+            return; // Do NOT advance when removing a label
         }
 
         // Check relabel policy if file already has a different label
@@ -203,9 +259,20 @@ public static class LabelHelper
     {
         var currentFolderName = Path.GetFileName(directory);
 
-        // Toggle-off: if the file is already in a folder named after the label, move it back up
+        // Toggle-off: if the file is already in a folder named after the label
         if (string.Equals(currentFolderName, label, StringComparison.OrdinalIgnoreCase))
         {
+            // Keep the file in its label folder and advance if configured
+            if (settings.SameLabelPolicy == SameLabelPolicy.KeepAndAdvance)
+            {
+                if (settings.AutoAdvanceAfterLabel)
+                {
+                    await vm.WindowTabs.NavigateDirectionalAsync(false, NavigateTo.Next).ConfigureAwait(false);
+                }
+                return;
+            }
+
+            // Remove the label: move it back up to the parent folder
             var parentDir = Path.GetDirectoryName(directory);
             if (parentDir is null)
             {
@@ -221,7 +288,7 @@ public static class LabelHelper
 
             await PerformRenameAsync(tab, oldPath, newPath, vm);
             TooltipHelper.ShowTooltipMessage($"Label '{label}' removed");
-            return; // Do NOT advance on toggle-off
+            return; // Do NOT advance when removing a label
         }
 
         // Check relabel policy: if file is in a known label subfolder already

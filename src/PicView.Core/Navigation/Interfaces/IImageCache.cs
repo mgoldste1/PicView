@@ -9,7 +9,7 @@ namespace PicView.Core.Navigation.Interfaces;
 /// <para>
 /// Implementations of this interface serve as the primary access point for acquiring <see cref="ImageModel"/> data, 
 /// managing the lifecycle of cached items across different owners (tabs), and coordinating 
-/// with the <see cref="IPreloader"/> worker.
+/// with the <see cref="Preloader"/> worker.
 /// </para>
 /// </summary>
 public interface IImageCache
@@ -31,29 +31,14 @@ public interface IImageCache
     bool TryGet(FileInfo f, out PreLoadValue? value);
 
     /// <summary>
-    /// Attempts to retrieve a preload value by owner ID and index.
-    /// </summary>
-    bool TryGet(uint ownerId, int index, out PreLoadValue? value);
-
-    /// <summary>
-    /// Clears the entire cache across all owners.
-    /// </summary>
-    void Clear();
-
-    /// <summary>
     /// Clears cache items associated specifically with the given owner ID.
     /// </summary>
     void Clear(uint ownerId);
 
     /// <summary>
-    /// Checks if the cache contains a file with the specified path.
-    /// </summary>
-    bool Contains(PreLoadValue value);
-
-    /// <summary>
     /// Adds a value to the cache, potentially triggering eviction of distant items.
     /// </summary>
-    bool Add(uint ownerId, int index, PreLoadValue preLoadValue, int listCount, bool isReverse);
+    void Add(uint ownerId, int index, PreLoadValue preLoadValue, int listCount, bool isReverse);
 
     /// <summary>
     /// Tries to add a value to the cache, returning the evicted value if capacity was exceeded.
@@ -80,9 +65,7 @@ public interface IImageCache
     /// Helper to clear resources specifically for a <see cref="TabViewModel"/>.
     /// Transfers relevant cache items to another eligible tab if possible before removing.
     /// </summary>
-    void Clear(TabViewModel tab, int currentIndex, string directory, IReadOnlyList<FileInfo> files);
-
-    void TryRemove(uint ownerId, int index);
+    void Clear(TabViewModel tab, string directory);
 
     /// <summary>
     /// Fully evicts and disposes any cached entry for the given file path across all owners,
@@ -96,5 +79,6 @@ public interface IImageCache
     /// </summary>
     void Resynchronize(uint ownerId, IReadOnlyList<FileInfo> files);
 
-    ValueTask<bool> WaitForLoadingCompleteAsync(uint ownerId, int index);
+    ValueTask<bool> WaitForLoadingCompleteAsync(uint ownerId, int index, IReadOnlyList<FileInfo> list,
+        CancellationToken ct = default);
 }

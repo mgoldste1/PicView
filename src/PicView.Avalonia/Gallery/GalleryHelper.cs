@@ -7,16 +7,19 @@ namespace PicView.Avalonia.Gallery;
 
 public static class GalleryHelper
 {
-    public static (double width, double height) GetGallerySize(MainWindowViewModel main)
+    public static (double width, double height) GetGallerySize(MainWindowViewModel vm)
     {
-        if (!Settings.Gallery.IsGalleryDocked || Slideshow.IsRunning || 
-            !Settings.Gallery.ShowDockedGalleryInHiddenUI && !main.IsUIShown.CurrentValue)
+        var tabs = vm.WindowTabs;
+        var tab = tabs.ActiveTab.CurrentValue;
+        var gallery = tab.Gallery;
+        if (!Settings.Gallery.IsGalleryDocked || Slideshow.IsRunning || gallery.IsGalleryExpanded.CurrentValue ||
+            !Settings.Gallery.ShowDockedGalleryInHiddenUI && !vm.IsUIShown.CurrentValue)
         {
             return (0, 0);
         }
 
         Rect galleryBounds;
-        if (main.WindowTabs.ActiveTab.CurrentValue.CurrentView.CurrentValue is ImageViewer imageViewer)
+        if (tab.CurrentView.CurrentValue is ImageViewer imageViewer)
         {
             galleryBounds = imageViewer.GalleryView.Bounds;
         }
@@ -25,8 +28,7 @@ public static class GalleryHelper
             return (0, 0);
         }
 
-        if (main.WindowTabs.ActiveTab.CurrentValue.Gallery.IsLeftDocked.CurrentValue || 
-            main.WindowTabs.ActiveTab.CurrentValue.Gallery.IsRightDocked.CurrentValue)
+        if (tab.Gallery.IsLeftDocked.CurrentValue || tab.Gallery.IsRightDocked.CurrentValue)
         {
             return (galleryBounds.Width, 0);
         }

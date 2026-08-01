@@ -9,8 +9,6 @@ namespace PicView.Core.ViewModels;
 /// </summary>
 public class FileAssociationsViewModel : IDisposable
 {
-    private readonly CompositeDisposable _disposables = new();
-
     public FileAssociationsViewModel()
     {
         // Create file type groups and populate with data
@@ -23,34 +21,27 @@ public class FileAssociationsViewModel : IDisposable
 
         // Commands
         ApplyCommand = canExecute
-            .ToReactiveCommand(async _ => await ApplyFileAssociations())
-            .AddTo(_disposables);
+            .ToReactiveCommand(async _ => await ApplyFileAssociations());
 
         UnassociateCommand = canExecute
-            .ToReactiveCommand(async _ => { await UnassociateFileAssociations(); })
-            .AddTo(_disposables);
+            .ToReactiveCommand(async _ => { await UnassociateFileAssociations(); });
 
         ClearFilterCommand = canExecute
-            .ToReactiveCommand(_ => { FilterText.Value = string.Empty; })
-            .AddTo(_disposables);
+            .ToReactiveCommand(_ => { FilterText.Value = string.Empty; });
 
         ResetCommand = canExecute
-            .ToReactiveCommand(_ => { ResetFileTypesToDefault(); })
-            .AddTo(_disposables);
+            .ToReactiveCommand(_ => { ResetFileTypesToDefault(); });
 
         SelectAllCommand = canExecute
-            .ToReactiveCommand(_ => { SelectAllFileTypes(); })
-            .AddTo(_disposables);
+            .ToReactiveCommand(_ => { SelectAllFileTypes(); });
 
         UnselectAllCommand = canExecute
-            .ToReactiveCommand(_ => { UnselectAllFileTypes(); })
-            .AddTo(_disposables);
+            .ToReactiveCommand(_ => { UnselectAllFileTypes(); });
 
         // Opacity reacts to IsProcessing
         IsProcessing
             .AsObservable()
-            .Subscribe(isProcessing => { Opacity.Value = isProcessing ? 0.3 : 1.0; })
-            .AddTo(_disposables);
+            .Subscribe(isProcessing => { Opacity.Value = isProcessing ? 0.3 : 1.0; });
     }
 
     /// <summary>
@@ -103,12 +94,6 @@ public class FileAssociationsViewModel : IDisposable
     /// Command to unselect all visible file types.
     /// </summary>
     public ReactiveCommand? UnselectAllCommand { get; }
-
-    public void Dispose()
-    {
-        Disposable.Dispose(IsProcessing, Opacity, ApplyCommand, ClearFilterCommand, UnassociateCommand, ResetCommand,
-            SelectAllCommand, UnselectAllCommand);
-    }
 
     #region Selection
 
@@ -206,7 +191,7 @@ public class FileAssociationsViewModel : IDisposable
             foreach (var fileType in group.FileTypes.Where(ft => ft.IsVisible.CurrentValue))
             {
                 totalVisible++;
-                if (fileType.IsSelected == null)
+                if (fileType.IsSelected.Value == null)
                 {
                     indeterminateCount++;
                 }
@@ -261,4 +246,15 @@ public class FileAssociationsViewModel : IDisposable
     }
 
     #endregion
+    
+    public void Dispose()
+    {
+        Disposable.Dispose(IsProcessing, Opacity, ApplyCommand, ClearFilterCommand, UnassociateCommand, ResetCommand,
+            SelectAllCommand, UnselectAllCommand);
+        foreach (var fileTypeGroup in FileTypeGroups)
+        {
+            fileTypeGroup.Dispose();
+        }
+        GC.SuppressFinalize(this);
+    }
 }

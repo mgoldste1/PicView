@@ -19,6 +19,7 @@ public class FileTypeGroup : IDisposable
 
     public void Dispose()
     {
-        Disposable.Dispose();
+        IsSelected.Dispose();
+        GC.SuppressFinalize(this);
     }
 }

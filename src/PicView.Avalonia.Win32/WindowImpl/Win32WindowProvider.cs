@@ -1,4 +1,5 @@
 ﻿using Avalonia.Controls;
+using PicView.Avalonia.CustomControls;
 using PicView.Avalonia.Interfaces;
 using PicView.Avalonia.Win32.PlatformUpdate;
 using PicView.Avalonia.Win32.Views;
@@ -11,13 +12,16 @@ namespace PicView.Avalonia.Win32.WindowImpl;
 
 public class Win32WindowProvider : IWindowProvider
 {
+    public MainWindow CreateMainWindow() => new WinMainWindow();
     public Window CreateAboutWindow() => new AboutWindow();
 
     public Window CreateBatchResizeWindow(BatchResizeWindowConfig config) => new BatchResizeWindow(config);
+    
+    public Window CreateFileAssociationsWindow() => new FileAssociationWindow();
 
     public Window CreateConvertWindow() => new ConvertWindow();
 
-    public Window CreateEffectsWindow() => new EffectsWindow();
+    public Window CreateEffectsWindow(EffectsWindowConfig config) => new EffectsWindow(config);
 
     public Window CreateImageInfoWindow(MainWindowViewModel vm) => new ImageInfoWindow(vm);
 

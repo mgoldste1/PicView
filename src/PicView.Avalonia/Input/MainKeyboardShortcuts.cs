@@ -4,7 +4,6 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Input;
 using PicView.Avalonia.CustomControls;
 using PicView.Avalonia.Navigation;
-using PicView.Avalonia.UI;
 using PicView.Core.ViewModels;
 
 namespace PicView.Avalonia.Input;
@@ -44,9 +43,7 @@ public static class MainKeyboardShortcuts
     /// <summary>
     /// Processes the KeyDown event for the main window.
     /// </summary>
-    /// <param name="e">The key event arguments.</param>
-    /// <param name="mainWindowViewModel">The ViewModel of the active MainWindow.</param>
-    public static async ValueTask MainWindow_KeysDownAsync(KeyEventArgs e, MainWindowViewModel? mainWindowViewModel)
+    public static async ValueTask MainWindow_KeysDownAsync(KeyEventArgs e, MainWindowViewModel? mainWindowViewModel, MainWindow mainWindow)
     {
         if (KeybindingManager.CustomShortcuts is null || !IsKeysEnabled)
         {
@@ -64,14 +61,20 @@ public static class MainKeyboardShortcuts
 #endif
 
         // Create key gesture from current state
-        CurrentKeys = new KeyGesture(e.Key, CurrentModifiers);
+        // Use e.KeyModifiers (from the event args) instead of the manually tracked
+        // CurrentModifiers, because the manual tracking can be out of sync if a
+        // modifier key-down event was missed (e.g. focus changes, window deactivation,
+        // or the modifier was pressed before the window had focus). This ensures that
+        // a bare-key binding such as "S" (rotate) only fires when no modifiers are
+        // actually held, so "Ctrl+S" (save) is never mistakenly dispatched as "S".
+        CurrentKeys = new KeyGesture(e.Key, e.KeyModifiers);
 
         // Track key repeat for held down state
         _keyRepeatCount++;
         IsKeyHeldDown = _keyRepeatCount > KeyRepeatThreshold;
 
         // Handle special cases before processing shortcuts
-        if (await HandleSpecialCases(e, mainWindowViewModel))
+        if (await HandleSpecialCases(e, mainWindowViewModel, mainWindow))
         {
             return;
         }
@@ -168,14 +171,17 @@ public static class MainKeyboardShortcuts
     /// Handles special cases like cropping, dialog handling, and escape key.
     /// </summary>
     /// <returns>True if the key event was handled by a special case handler.</returns>
-    private static async ValueTask<bool> HandleSpecialCases(KeyEventArgs e, MainWindowViewModel? vm)
+    private static async ValueTask<bool> HandleSpecialCases(KeyEventArgs e, MainWindowViewModel? vm, MainWindow mainWindow)
     {
         // Handle cropping mode
         if (vm.WindowTabs.ActiveTab.CurrentValue.CropService is not null)
         {
-            if (vm.WindowTabs.ActiveTab.CurrentValue.CropService.IsCropping )
+            if (vm.WindowTabs.ActiveTab.CurrentValue.CropService.IsCropping)
             {
-                vm.WindowTabs.ActiveTab.CurrentValue.CropService.CloseCropControl();
+                if (e.Key is Key.Escape)
+                {
+                    vm.WindowTabs.ActiveTab.CurrentValue.CropService.CloseCropControl();
+                }
                 return true;
             }
         }
@@ -186,7 +192,7 @@ public static class MainKeyboardShortcuts
         }
 
         // Handle open dialog
-        if (DialogManager.IsDialogOpen)
+        if (mainWindow.IsDialogOpen)
         {
             if (e.Key is not Key.Escape)
             {
@@ -199,7 +205,7 @@ public static class MainKeyboardShortcuts
                 return true;
             }
                 
-            var animatedPopUp = UIHelper.GetMainView.MainPanel.Children.OfType<AnimatedPopUp>().FirstOrDefault();
+            var animatedPopUp = mainWindow.UIHelper.GetMainView.MainPanel.Children.OfType<AnimatedPopUp>().FirstOrDefault();
             if (animatedPopUp is not null)
             {
                 await animatedPopUp.AnimatedClosing();
@@ -263,6 +269,15 @@ public static class MainKeyboardShortcuts
             return;
         }
 
+        // Labeling is a deliberate, one-press-one-action operation. Ignore OS key
+        // auto-repeat (held-down key) so holding a label key doesn't march through and
+        // label every file in the folder. Navigation actions intentionally still honor
+        // key-repeat, so this suppression is scoped to label actions only.
+        if (IsKeyHeldDown && IsLabelAction(actionName))
+        {
+            return;
+        }
+
         // Map the string to the instance-specific function using the view model's mapper
         var function = vm.Mapper.GetFunctionByName(actionName);
         if (function is not null)
@@ -270,6 +285,14 @@ public static class MainKeyboardShortcuts
             await function.Invoke().ConfigureAwait(false);
         }
     }
+
+    /// <summary>
+    /// Determines whether an action name corresponds to a labeling command (apply or clear),
+    /// which should not repeat on a held-down key.
+    /// </summary>
+    private static bool IsLabelAction(string actionName) =>
+        actionName.StartsWith("Label:", StringComparison.OrdinalIgnoreCase) ||
+        actionName.Equals("ClearLabel", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Resets the keyboard state tracking.

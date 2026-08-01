@@ -100,6 +100,10 @@
         <DependentUpon>PrintPreviewWindow2.axaml</DependentUpon>
         <SubType>Code</SubType>
       </Compile>
+      <Compile Update="Views\FileAssociationWindow.axaml.cs">
+        <DependentUpon>FileAssociationWindow.axaml</DependentUpon>
+        <SubType>Code</SubType>
+      </Compile>
   </ItemGroup>
 
 	<ItemGroup>

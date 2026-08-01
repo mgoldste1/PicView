@@ -46,8 +46,7 @@ public interface IImageIterator : IDisposable
     /// <summary>
     /// Clears the cache and reloads the current image.
     /// </summary>
-    /// <param name="ct">A <see cref="CancellationTokenSource"/> used to monitor for cancellation requests.</param>
-    ValueTask ReloadAsync(CancellationTokenSource ct);
+    ValueTask ReloadAsync(bool clearCache = true);
 
     /// <summary>
     /// Moves the iterator to the specified index, triggers image loading, and handles UI updates.

@@ -3,8 +3,8 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
-using Avalonia.LogicalTree;
 using Avalonia.Threading;
+using PicView.Avalonia.CustomControls;
 using PicView.Avalonia.ImageTransformations;
 using PicView.Avalonia.Input;
 using PicView.Avalonia.UI;
@@ -16,7 +16,6 @@ using PicView.Core.ViewModels;
 using R3;
 
 namespace PicView.Avalonia.Views.UC;
-
 
 public partial class ImageViewer : UserControl, IDisposable
 {
@@ -33,9 +32,11 @@ public partial class ImageViewer : UserControl, IDisposable
     private void OnLoaded(object? sender, RoutedEventArgs e)
     {
         InitializeImageTransformer();
+        
         AddHandler(PointerWheelChangedEvent, PreviewOnPointerWheelChanged, RoutingStrategies.Tunnel);
         AddHandler(PointerTouchPadGestureMagnifyEvent, TouchMagnifyEvent, RoutingStrategies.Bubble);
         AddHandler(PinchEvent, TouchMagnifyEvent, RoutingStrategies.Bubble);
+        _disposables.Add(new HoverFadeButtonHandler(GalleryShortcut, GalleryShortcut.InnerButton));
     }
 
     public void TriggerScalingModeUpdate(bool invalidate) =>
@@ -51,14 +52,15 @@ public partial class ImageViewer : UserControl, IDisposable
             return;
         }
 
-        if (sender is not ImageViewer { DataContext: TabViewModel tab })
+        if (TopLevel.GetTopLevel(this) is not MainWindow mainWindow)
         {
             return;
         }
         
         await MouseShortcuts.HandlePointerWheelChanged(
             e,
-            tab.ParentWindowContext, 
+            mainWindow.DataContext as MainWindowViewModel,          
+            mainWindow,
             ImageScrollViewer,
             async args => await Dispatcher.UIThread.InvokeAsync(() => ZoomIn(args)),
             async args => await Dispatcher.UIThread.InvokeAsync(() => ZoomOut(args)));
@@ -83,7 +85,8 @@ public partial class ImageViewer : UserControl, IDisposable
         _imageTransformer = new RotationTransformer(
             MainTransform,
             MainImage,
-            core.MainWindows.ActiveWindow.CurrentValue);
+            core.MainWindows.ActiveWindow.CurrentValue,
+            TopLevel.GetTopLevel(this) as MainWindow);
         ZoomPanControl.Initialize(ZoomPreview);
 
         Observable.EveryValueChanged(ZoomPanControl, zoom => zoom.Scale)
@@ -101,7 +104,7 @@ public partial class ImageViewer : UserControl, IDisposable
                 {
                     var message = StringExtensions.CombineWithPercentage(adjustedZoomLevel);
                     _ = TooltipHelper.ShowTooltipMessageContinuallyAsync(message, true,
-                        TimeSpan.FromSeconds(1));
+                        TopLevel.GetTopLevel(this) as MainWindow, TimeSpan.FromSeconds(1));
                 }
 
                 ZoomPreview.Margin = HoverBar.Opacity > 0 ? new Thickness(0,0,25,HoverBar.Bounds.Height / 2 + 25) : new Thickness(0, 0, 25, 25);

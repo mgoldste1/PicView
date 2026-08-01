@@ -1,11 +1,9 @@
-﻿using PicView.Core.ViewModels;
-
-namespace PicView.Core.IPlatform;
+﻿namespace PicView.Core.IPlatform;
 
 public interface ICropService
 {
     bool IsCropping { get; }
-    Task StartCropControlAsync(MainWindowViewModel vm);
+    Task StartCropControlAsync();
     void CloseCropControl();
     
     object? GetCroppedImage();

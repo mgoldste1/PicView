@@ -1,9 +1,11 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Threading;
 using PicView.Avalonia.Animations;
 using PicView.Avalonia.Views.UC;
 using PicView.Core.DebugTools;
+using PicView.Core.ViewModels;
 
 namespace PicView.Avalonia.UI;
 
@@ -61,11 +63,6 @@ public class HoverFadeButtonHandler : IDisposable
 
     private void OnPointerExited(object? sender, PointerEventArgs e)
     {
-        if (e.Pointer.Captured != null) // Don't fade out when captured
-        {
-            return;
-        }
-        
         // Delay fade-out to ensure pointer is truly outside both parent and child
         Dispatcher.CurrentDispatcher.Post(async () =>
         {
@@ -84,19 +81,26 @@ public class HoverFadeButtonHandler : IDisposable
             return false;
         }
 
-        if (_mainButton is HoverBar hoverBar)
+        if (_mainButton is not HoverBar hoverBar)
         {
-            if (!Settings.UIProperties.ShowHoverNavigationBar || Settings.UIProperties.ShowBottomNavBar)
-            {
-                hoverBar.IsVisible = false;
-                return false;
-            }
-            if (!Settings.UIProperties.ShowInterface && Settings.UIProperties.ShowHoverNavigationBar)
-            {
-                hoverBar.IsVisible = true;
-            }
+            return true;
         }
-        return true;
+
+        if (!Settings.UIProperties.ShowHoverNavigationBar)
+        {
+            hoverBar.IsVisible = false;
+            return false;
+        }
+
+        if (Application.Current.DataContext is not CoreViewModel core)
+        {
+            return true;
+        }
+
+        var isBottomToolbarShown =
+            core.MainWindows.ActiveWindow.CurrentValue.IsBottomToolbarShown.CurrentValue;
+        hoverBar.IsVisible = !isBottomToolbarShown;
+        return !isBottomToolbarShown;
     }
 
     /// <summary>

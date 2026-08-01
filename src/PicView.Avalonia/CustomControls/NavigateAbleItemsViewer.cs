@@ -6,7 +6,6 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
-using PicView.Core.DebugTools;
 using PicView.Core.Gallery;
 using PicView.Core.ViewModels;
 
@@ -20,7 +19,6 @@ public class NavigateAbleItemsViewer : ItemsControl
     #region Fields and  Avalonia Properties
     
     private AutoScrollViewer? _scrollViewer;
-    private bool _isVerticalScrolling;
 
     protected override Type StyleKeyOverride => typeof(NavigateAbleItemsViewer);
 
@@ -115,7 +113,6 @@ public class NavigateAbleItemsViewer : ItemsControl
 
     public void SetVerticalScrolling()
     {
-        _isVerticalScrolling = true;
         if (_scrollViewer == null)
         {
             return;
@@ -127,7 +124,6 @@ public class NavigateAbleItemsViewer : ItemsControl
     
     public void SetHorizontalScrolling()
     {
-        _isVerticalScrolling = false;
         if (_scrollViewer == null)
         {
             return;
@@ -383,6 +379,8 @@ public class NavigateAbleItemsViewer : ItemsControl
                 break;
             default: return;
         }
+        
+        ContainerFromIndex(SelectedItemIndex)?.BringIntoView();
     }
 
     private List<ItemPosition> GetItemPositions()

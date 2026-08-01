@@ -3,6 +3,8 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.LogicalTree;
+using PicView.Avalonia.CustomControls;
+using PicView.Avalonia.StartUp;
 using PicView.Avalonia.WindowBehavior;
 using PicView.Core.ViewModels;
 
@@ -24,24 +26,42 @@ public partial class FileHistoryItem : UserControl
         {
             return;
         }
-        var window = core.MainWindows.ActiveWindow.CurrentValue;
-        var tabs = window.WindowTabs;
-        window.TopTitlebarViewModel.DropDownMenu.IsDropDownMenuVisible.Value = false;
-        var isViewStartUpMenu = false;
-        if (tabs.ActiveTab.CurrentValue.CurrentView.CurrentValue is StartUpMenu)
+        var vm = core.MainWindows.ActiveWindow.CurrentValue;
+        vm.TopTitlebarViewModel.DropDownMenu.IsDropDownMenuVisible.Value = false;
+        
+        var tabs = vm.WindowTabs;
+        var tab = tabs.ActiveTab.CurrentValue;
+        var path = entry.FilePath.CurrentValue;
+        
+        if (!tab.IsInitialized)
         {
-            tabs.ActiveTab.CurrentValue.CurrentView.Value = new ImageViewer();
+            if ( TopLevel.GetTopLevel(this) is not MainWindow mainWindow)
+            {
+                return;
+            }
+            await QuickLoad.QuickLoadAsync(mainWindow, core, path, true);
+            return;
+        }
+
+        var isViewStartUpMenu = false;
+        if (tab.CurrentView.CurrentValue is StartUpMenu)
+        {
+            tab.CurrentView.Value = new ImageViewer();
             isViewStartUpMenu = true;
         }
         
-        var isLoadedSuccessfully = await tabs.LoadFromStringAsync(entry.FilePath.CurrentValue);
+        var isLoadedSuccessfully = await tabs.LoadFromStringAsync(path);
         if (!isLoadedSuccessfully && isViewStartUpMenu)
         {
-            tabs.ActiveTab.CurrentValue.CurrentView.Value = new StartUpMenu();
+            tab.CurrentView.Value = new StartUpMenu();
         }
         else
         {
-            WindowResizing.SetSize(window, WindowResizeReason.Layout);
+            if (TopLevel.GetTopLevel(this) is not MainWindow mainWindow)
+            {
+                return;
+            }
+            WindowResizing.SetSize(mainWindow, WindowResizeReason.Layout);
         }
     }
 

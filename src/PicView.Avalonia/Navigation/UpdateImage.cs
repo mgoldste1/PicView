@@ -2,7 +2,9 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media.Imaging;
 using Avalonia.Svg.Skia;
+using Avalonia.Threading;
 using ImageMagick;
+using PicView.Avalonia.CustomControls;
 using PicView.Avalonia.Views.UC;
 using PicView.Avalonia.WindowBehavior;
 using PicView.Core.DebugTools;
@@ -17,10 +19,10 @@ namespace PicView.Avalonia.Navigation;
 
 public static class UpdateImage
 {
-    public static void UpdateFileInfo(TabViewModel tabViewModel, FileInfo? file)
+    public static void UpdateFileInfo(TabViewModel tabViewModel,  FileInfo? file)
     {
         if (tabViewModel.Model?.Image is null || tabViewModel.Model.PixelHeight is 0 ||
-            tabViewModel.Model.PixelWidth is 0)
+            tabViewModel.Model.PixelWidth is 0 || tabViewModel.SingleImageType is not SingleImageType.None)
         {
             return;
         }
@@ -44,7 +46,7 @@ public static class UpdateImage
             return;
         }
         
-        if (Settings.UIProperties.IsTaskbarProgressEnabled)
+        if (Settings.UIProperties.IsTaskbarProgressEnabled && tabViewModel.ImageIterator.CurrentIndex > -1 && tabViewModel.ImageIterator.Files.Count > 0)
         {
             core.PlatformService.SetTaskbarProgress((ulong)tabViewModel.ImageIterator.CurrentIndex, (ulong)tabViewModel.ImageIterator.Files.Count);
         }
@@ -81,11 +83,25 @@ public static class UpdateImage
         tabViewModel.TitleTooltip.Value = titles.FilePathTitle;
     }
 
-    public static void ChangeImage(TabViewModel tabViewModel, MainWindowViewModel vm)
+    public static void ChangeImage(MainWindow mainWindow, TabViewModel tabViewModel, MainWindowViewModel vm)
     {
+        if (vm.WindowTabs.ActiveTab.CurrentValue.CurrentView.CurrentValue is not ImageViewer imageViewer)
+        {
+            return;
+        }
+        
+        if (Settings.Zoom.ResetZoomOnChange)
+        {
+            imageViewer.ResetZoomSlim();
+            tabViewModel.RotationAngle.Value = 0;
+        }
+        
         if (tabViewModel.Model.ImageType is ImageType.Svg)
         {
-            tabViewModel.Image.Value = new SvgImage { Source = tabViewModel.Model.Image as SvgSource };
+            Dispatcher.UIThread.Invoke(() =>
+            {
+                tabViewModel.Image.Value = new SvgImage { Source = tabViewModel.Model.Image as SvgSource };
+            }, DispatcherPriority.Send);
         }
         else
         {
@@ -93,6 +109,18 @@ public static class UpdateImage
         }
         tabViewModel.ImageType.Value = tabViewModel.Model.ImageType;
         
+        SetWindowAndImageSize(mainWindow, tabViewModel, vm);
+
+        if (tabViewModel.Gallery.IsDockedGalleryVisible.CurrentValue)
+        {
+            imageViewer.GalleryView.GalleryItemsControl.ScrollToCenterOfCurrentItem();
+        }
+        tabViewModel.ZoomLevel.Value = Convert.ToInt32(tabViewModel.InitialZoom.CurrentValue * 100);;
+        tabViewModel.UpdateTabTitle();
+    }
+
+    public static void SetWindowAndImageSize(MainWindow mainWindow, TabViewModel tabViewModel, MainWindowViewModel vm)
+    {
         double secondaryWidth, secondaryHeight;
         if (Settings.ImageScaling.ShowImageSideBySide)
         {
@@ -127,28 +155,10 @@ public static class UpdateImage
             tabViewModel.Model.PixelHeight, 
             secondaryWidth, secondaryHeight,
             WindowResizeReason.Application,
-            vm);
-        
-        if (vm.WindowTabs.ActiveTab.CurrentValue.CurrentView.CurrentValue is not ImageViewer imageViewer)
-        {
-            return;
-        }
-        
-        if (Settings.Zoom.ResetZoomOnChange)
-        {
-            imageViewer.ResetZoomSlim();
-            imageViewer.Rotate(0);
-        }
-
-        if (tabViewModel.Gallery.IsDockedGalleryVisible.CurrentValue)
-        {
-            imageViewer.GalleryView.GalleryItemsControl.ScrollToCenterOfCurrentItem();
-        }
-        tabViewModel.ZoomLevel.Value = Convert.ToInt32(tabViewModel.InitialZoom.CurrentValue * 100);;
-        tabViewModel.UpdateTabTitle();
+            mainWindow, vm);
     }
 
-    public static void SetSingleImage(MainWindowViewModel vm, Bitmap image, SingleImageType type, string name)
+    public static void SetSingleImage(MainWindowViewModel vm, MainWindow mainWindow, Bitmap image, SingleImageType type, string name)
     {
         var tabViewModel = vm.WindowTabs.ActiveTab.CurrentValue;
         if (tabViewModel?.CurrentView?.CurrentValue is not ImageViewer imageViewer)
@@ -162,7 +172,7 @@ public static class UpdateImage
         imageViewer.ResetZoomSlim();
         imageViewer.Rotate(0);
 
-        tabViewModel.Gallery.GalleryMode.Value = GalleryMode2.Closed;
+        tabViewModel.Gallery.ActiveGalleryMode.Value = GalleryMode.Closed;
 
         var width = (uint)image.PixelSize.Width;
         var height = (uint)image.PixelSize.Height;
@@ -171,7 +181,7 @@ public static class UpdateImage
         {
             WindowResizing.SetSize(width, height, 0,0,
                 WindowResizeReason.Application,
-                vm);
+                mainWindow, vm);
         }
         var zoom = tabViewModel.ZoomLevel.CurrentValue;
         var windowTitles = ImageTitleFormatter.GenerateTitleForSingleImage(width, height, name, zoom);

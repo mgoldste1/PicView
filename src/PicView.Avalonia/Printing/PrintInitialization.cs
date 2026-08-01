@@ -106,5 +106,11 @@ public static class PrintInitialization
             await printEngine.RunPrintAsync(vm.WindowTabs.ActiveTab.CurrentValue, vm.PrintPreview);
         }, DebugHelper.LogError(nameof(PrintInitialization), nameof(InitializeAsync)))
         .AddTo(vm.PrintPreview.Disposables);
+        
+        vm.WindowTabs.ActiveTab.CurrentValue.Image.Skip(1).SubscribeAwait(async (_, _) =>
+        {
+            await printEngine.UpdatePreviewAsync(vm.WindowTabs.ActiveTab.CurrentValue, vm.PrintPreview);
+        }, DebugHelper.LogError(nameof(PrintInitialization), nameof(InitializeAsync)))
+        .AddTo(vm.PrintPreview.Disposables);
     }
 }

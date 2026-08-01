@@ -6,6 +6,8 @@ using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
+using PicView.Avalonia.CustomControls;
+using PicView.Avalonia.StartUp;
 using PicView.Core.DebugTools;
 using PicView.Core.ProcessHandling;
 using PicView.Core.ViewModels;
@@ -25,7 +27,7 @@ public static class IPC
     /// This pipe is used to facilitate communication between instances of the application.
     /// </summary>
     private const string PipeName = "PicViewPipe";
-    
+
     private static bool? _isRunning;
     
     public static void SendWithArgs(string[] args)
@@ -40,6 +42,7 @@ public static class IPC
             RetrySendingArgs(args);
         }
     }
+    
 
     private static void RetrySendingArgs(string[] args)
     {
@@ -145,23 +148,37 @@ public static class IPC
                     Trace.WriteLine("Received argument: " + line);
 #endif
 
-                    if (Application.Current.DataContext is not CoreViewModel core)
+                    var core = await Dispatcher.UIThread.InvokeAsync(() => Application.Current.DataContext as CoreViewModel);
+                    if (core is null)
                     {
                         return;
                     }
                     // Need to stop taskbar progress if it's running
                     // Otherwise the new taskbar progress will not be updated
                     core.PlatformService.StopTaskbarProgress();
-                    await Dispatcher.UIThread.InvokeAsync(() => 
+                    var desktop = await Dispatcher.UIThread.InvokeAsync(() => Application.Current.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime);
+                    var activeWindow = core.MainWindows.ActiveWindow.CurrentValue;
+                    var tabs = activeWindow.WindowTabs;
+                    var tab = tabs.ActiveTab.CurrentValue;
+                    activeWindow.IsLoadingIndicatorShown.Value = true;
+                    if (!tab.IsInitialized)
                     {
-                        if (Application.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop)
+                        var mainWindow = await Dispatcher.UIThread.InvokeAsync(() => desktop?.MainWindow as MainWindow);
+                        if (mainWindow is null)
                         {
                             return;
                         }
-                        // Activating the window works fine in debug mode, but not in AOT release mode 
-                        desktop.MainWindow.Activate();
+                        await QuickLoad.QuickLoadAsync(mainWindow, core, line, continueFromLeftOff: false).ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        await tabs.LoadFromStringAsync(line).ConfigureAwait(false);
+                    }
+                    activeWindow.IsLoadingIndicatorShown.Value = false;
+                    await Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        desktop?.MainWindow.Activate();
                     });
-                    await core.MainWindows.ActiveWindow.CurrentValue.WindowTabs.LoadFromStringAsync(line).ConfigureAwait(false);
                 }
             }
             catch (Exception ex)

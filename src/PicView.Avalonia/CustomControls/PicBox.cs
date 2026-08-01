@@ -10,8 +10,10 @@ using Avalonia.Metadata;
 using Avalonia.Rendering.Composition;
 using ImageMagick;
 using PicView.Avalonia.AnimatedImage;
+using PicView.Avalonia.ImageHandling;
 using PicView.Core.DebugTools;
 using PicView.Core.ImageDecoding;
+using PicView.Core.Navigation;
 using PicView.Core.ViewModels;
 
 namespace PicView.Avalonia.CustomControls;
@@ -258,26 +260,68 @@ public class PicBox : Control
         {
             using (context.PushRenderOptions(options))
             {
-                context.DrawImage(source as IImage, sourceRect, destRect);
+                context.DrawImage(source, sourceRect, destRect);
                 RenderAnimatedImageIfRequired(context);
             }
         }
-        catch (Exception e)
+        catch (ObjectDisposedException e)
         {
-            var bitmap = GetBitmapFromAlternativeSources();
-            if (bitmap != null)
+            if (Application.Current.DataContext is CoreViewModel core)
+            {
+                core.SharedCache.Clear();
+            }
+            if (DataContext is TabViewModel tab)
             {
                 try
                 {
-                    using (context.PushRenderOptions(options))
+                    if (ImageType is not ImageType.Bitmap)
                     {
-                        context.DrawImage(source, sourceRect, destRect);
+                        return;
                     }
+                    var model = GetImageModel.GetImageModelAsync(tab.FileInfo?.CurrentValue).AsTask().Result;
+                    var bitmap = model?.Image;
+                    if (bitmap is not null)
+                    {
+                        try
+                        {
+                            using (context.PushRenderOptions(options))
+                            {
+                                context.DrawImage(bitmap as IImage, sourceRect, destRect);
+                            }
 
+                        }
+                        catch (Exception exception)
+                        {
+                            DebugHelper.LogDebug(nameof(PicBox), nameof(RenderImageSource), exception);
+                        }
+                    }
                 }
                 catch (Exception exception)
                 {
-                    DebugHelper.LogDebug(nameof(PicBox), nameof(GetBitmapFromAlternativeSources), exception);
+                    DebugHelper.LogDebug(nameof(PicBox), nameof(RenderImageSource), exception);
+                }
+            }
+            DebugHelper.LogDebug(nameof(PicBox), nameof(RenderImageSource), e);
+        }
+        catch (Exception e)
+        {
+            if (ImageType is ImageType.Bitmap)
+            {
+                var bitmap = GetBitmapFromAlternativeSources();
+                if (bitmap is not null)
+                {
+                    try
+                    {
+                        using (context.PushRenderOptions(options))
+                        {
+                            context.DrawImage(source, sourceRect, destRect);
+                        }
+
+                    }
+                    catch (Exception exception)
+                    {
+                        DebugHelper.LogDebug(nameof(PicBox), nameof(GetBitmapFromAlternativeSources), exception);
+                    }
                 }
             }
             
@@ -361,11 +405,14 @@ public class PicBox : Control
             return new Size();
         }
 
-        if (tabs.SharedCache.TryGet(model.FileInfo, out var preloadValue))
+        if (tabs.SharedCache is SharedImageCache sharedCache)
         {
-            if (preloadValue?.ImageModel != null)
+            if (sharedCache.TryGet(model.FileInfo, out var preloadValue))
             {
-                return new Size(preloadValue.ImageModel.PixelWidth, preloadValue.ImageModel.PixelHeight);
+                if (preloadValue?.ImageModel != null)
+                {
+                    return new Size(preloadValue.ImageModel.PixelWidth, preloadValue.ImageModel.PixelHeight);
+                }
             }
         }
 

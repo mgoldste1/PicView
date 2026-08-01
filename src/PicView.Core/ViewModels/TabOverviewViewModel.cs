@@ -31,8 +31,9 @@ public class TabOverviewViewModel
     // Needed for correct context in multi-window scenarios
     private MainWindowViewModel? _parentVm;
 
-    public TabOverviewViewModel()
+    public TabOverviewViewModel(MainWindowViewModel parentVm)
     {
+        _parentVm = parentVm;
         ActiveTab = new BindableReactiveProperty<TabViewModel>(CreateInitialTab());
         ActiveTab.Value.IsSelected = true;
     }
@@ -85,8 +86,7 @@ public class TabOverviewViewModel
     
     private TabViewModel CreateTabInternal(FileInfo? file = null)
     {
-        var tab = new TabViewModel(CloseTab, SharedFileWatcher);
-        tab.ParentWindowContext = _parentVm;
+        var tab = new TabViewModel(CloseTab, _parentVm, SharedFileWatcher);
         if (file is not null)
         {
             tab.Model.FileInfo = file;
@@ -106,16 +106,6 @@ public class TabOverviewViewModel
         SelectTab(tab);
         return tab;
     }
-
-    public async ValueTask<TabViewModel> CreateNewTabFromFileAsync(string filePath)
-        => await CreateNewTabFromFileAsync(new FileInfo(filePath));
-    public async ValueTask<TabViewModel> CreateNewTabFromFileAsync(FileInfo file)
-    {
-        var tab = CreateTab(file);
-        await SharedNavigation.LoadFromFileAsync(file, tab, tab.GetTabCancellation())
-            .ConfigureAwait(false);
-        return tab;
-    }
     
     public void SetParentContext(MainWindowViewModel parent)
     {
@@ -130,7 +120,6 @@ public class TabOverviewViewModel
     public void SelectTab(TabViewModel tab)
     {
         ActiveTab.Value = tab;
-        
         ActiveTab.Value.IsSelected = true;
     }
     
@@ -376,11 +365,9 @@ public class TabOverviewViewModel
         tab.SingleImageType = SingleImageType.None;
     }
     
-    public async ValueTask LoadFromFileAsync(string file, TabViewModel? senderTab = null)
-    {
+    public async ValueTask LoadFromFileAsync(string file, TabViewModel? senderTab = null) => 
         await LoadFromFileAsync(new FileInfo(file), senderTab).ConfigureAwait(false);
-    }
-    
+
     public async ValueTask LoadFromDirectoryAsync(string file, TabViewModel? senderTab = null)
     {
         if (SharedNavigation is null)
@@ -432,8 +419,7 @@ public class TabOverviewViewModel
     public async ValueTask ReloadAsync(TabViewModel? senderTab = null)
     {
         var tab = senderTab ?? ActiveTab.Value;
-        var ct = tab.GetTabCancellation();
-        await tab.ImageIterator.ReloadAsync(ct).ConfigureAwait(false);
+        await tab.ImageIterator.ReloadAsync().ConfigureAwait(false);
     }
     #endregion
 

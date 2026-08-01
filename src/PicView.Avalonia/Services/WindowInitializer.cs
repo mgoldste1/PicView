@@ -1,13 +1,16 @@
-﻿using Avalonia;
+﻿using System.Runtime.InteropServices;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
+using PicView.Avalonia.CustomControls;
 using PicView.Avalonia.FileSystem;
 using PicView.Avalonia.Input;
 using PicView.Avalonia.Functions;
 using PicView.Avalonia.Interfaces;
 using PicView.Avalonia.WindowBehavior;
 using PicView.Core.Config;
+using PicView.Core.DebugTools;
 using PicView.Core.IPlatform;
 using PicView.Core.Update;
 using PicView.Core.ViewModels;
@@ -15,7 +18,7 @@ using R3;
 
 namespace PicView.Avalonia.Services;
 
-public class WindowInitializer(IWindowProvider provider) : IWindowInitializer, IPlatformSpecificUpdate
+public class WindowInitializer(IWindowProvider provider) : IPlatformSpecificUpdate
 {
     private Window? _aboutWindow;
     private Window? _batchResizeWindow;
@@ -26,10 +29,23 @@ public class WindowInitializer(IWindowProvider provider) : IWindowInitializer, I
     private Window? _settingsWindow;
     private Window? _singleImageResizeWindow;
     private Window? _printPreviewWindow;
+    private Window? _fileAssociationsWindow;
 
     public async Task HandlePlatformUpdate(UpdateInfo updateInfo, string tempPath)
     {
         await provider.HandlePlatformUpdate(updateInfo, tempPath);
+    }
+
+    public MainWindow CreateMainWindow()
+    {
+        var window = provider.CreateMainWindow();
+        if (Application.Current?.DataContext is CoreViewModel core &&
+            window.DataContext is MainWindowViewModel vm)
+        {
+            core.MainWindows.MainWindows.Add(vm);
+            core.MainWindows.ActiveWindow.Value = vm;
+        }
+        return window;
     }
 
     public void ShowAboutWindow()
@@ -150,12 +166,15 @@ public class WindowInitializer(IWindowProvider provider) : IWindowInitializer, I
                 core.Keybindings = new KeybindingsViewModel();
                 core.Keybindings.ResetKeybindingsCommand = new ReactiveCommand(async (_, ct) =>
                 {
+                    core.MainWindows.ActiveWindow.CurrentValue.IsLoadingIndicatorShown.Value = true;
                     _keybindingsWindow?.Close();
                     await Task.Run(() =>
                     {
                         KeybindingManager.SetDefaultKeybindings(core.PlatformService);
                         FunctionsKeyHelper.ResetKeybindings(core.Keybindings);
                     }, ct);
+                    await ShowKeybindingsWindow();
+                    core.MainWindows.ActiveWindow.CurrentValue.IsLoadingIndicatorShown.Value = false;
                 });
 
                 _ = Task.Run(async () =>
@@ -198,7 +217,7 @@ public class WindowInitializer(IWindowProvider provider) : IWindowInitializer, I
                 }
                 else
                 {
-                    Show();
+                    _keybindingsWindow.Activate();
                 }
             });
         }
@@ -207,7 +226,14 @@ public class WindowInitializer(IWindowProvider provider) : IWindowInitializer, I
 
         void Show()
         {
-            _keybindingsWindow?.Show(desktop.MainWindow);
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                _keybindingsWindow.Show();
+            }
+            else
+            {
+                _keybindingsWindow.Show(desktop.MainWindow);
+            }
         }
     }
 
@@ -223,6 +249,10 @@ public class WindowInitializer(IWindowProvider provider) : IWindowInitializer, I
         {
             core.SettingsViewModel = new SettingsViewModel(core.Translation);
             core.SettingsViewModel.Initialize(new ThemeService(), new LanguageService(), new ImageSettingsService());
+            core.SettingsViewModel.WindowMargin.Skip(1).Subscribe(_ =>
+            {
+                WindowResizing.SetSize(desktop.MainWindow as MainWindow, WindowResizeReason.Application);
+            }, DebugHelper.LogError(nameof(core.SettingsViewModel), nameof(core.SettingsViewModel.WindowMargin)));
         }
 
         if (core.SettingsViewModel.SettingsWindowConfig is null)
@@ -260,7 +290,7 @@ public class WindowInitializer(IWindowProvider provider) : IWindowInitializer, I
                 }
                 else
                 {
-                    Show();
+                    _settingsWindow.Activate();
                 }
             });
         }
@@ -271,46 +301,52 @@ public class WindowInitializer(IWindowProvider provider) : IWindowInitializer, I
         {
             WindowFunctions.InitializeWindowSizeAndPosition(_settingsWindow,
                 core.SettingsViewModel.SettingsWindowConfig.WindowProperties);
-            _settingsWindow?.Show(desktop.MainWindow);
+            _settingsWindow?.Show();
         }
     }
 
-    public void ShowEffectsWindow()
+    public async Task ShowEffectsWindow()
     {
-        if (Dispatcher.UIThread.CheckAccess())
+        if (Application.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop ||
+            Application.Current.DataContext is not CoreViewModel core)
         {
-            Set();
-        }
-        else
-        {
-            Dispatcher.UIThread.InvokeAsync(Set);
+            return;
         }
 
-        return;
-
-        void Set()
+        if (_effectsWindow is null)
         {
-            if (Application.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop ||
-                Application.Current.DataContext is not CoreViewModel core)
+            core.Effects ??= new EffectsViewModel();
+            if (core.Effects.WindowConfig is null)
             {
-                return;
+                core.Effects.WindowConfig = new EffectsWindowConfig();
+                await core.Effects.WindowConfig.LoadAsync();
             }
 
-            if (_effectsWindow is null)
+            await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                core.Effects ??= new EffectsViewModel();
-                _effectsWindow = provider.CreateEffectsWindow();
+                _effectsWindow = provider.CreateEffectsWindow(core.Effects.WindowConfig);
                 _effectsWindow.DataContext = core;
-                _effectsWindow.WindowStartupLocation = WindowStartupLocation.CenterOwner;
-
-                _effectsWindow.Show(desktop.MainWindow);
-                _effectsWindow.Closing += (_, _) =>
+                WindowFunctions.InitializeWindowPosition(_effectsWindow, core.Effects.WindowConfig.WindowProperties);
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                {
+                    _effectsWindow.Show();
+                }
+                else
+                {
+                    _effectsWindow.Show(desktop.MainWindow);
+                }
+                
+                _effectsWindow.Closing += async (_, _) =>
                 {
                     desktop.MainWindow?.Focus();
                     _effectsWindow = null;
+                    await core.Effects.WindowConfig.SaveAsync();
                 };
-            }
-            else
+            });
+        }
+        else
+        {
+            await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 if (_effectsWindow.WindowState == WindowState.Minimized)
                 {
@@ -320,7 +356,7 @@ public class WindowInitializer(IWindowProvider provider) : IWindowInitializer, I
                 {
                     _effectsWindow.Activate();
                 }
-            }
+            });
         }
     }
 
@@ -352,7 +388,15 @@ public class WindowInitializer(IWindowProvider provider) : IWindowInitializer, I
                 _singleImageResizeWindow = provider.CreateSingleImageResizeWindow(activeWindow);
                 _singleImageResizeWindow.WindowStartupLocation = WindowStartupLocation.CenterOwner;
 
-                _singleImageResizeWindow.Show(desktop.MainWindow);
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                {
+                    _singleImageResizeWindow.Show();
+                }
+                else
+                {
+                    _singleImageResizeWindow.Show(desktop.MainWindow);
+                }
+                
                 _singleImageResizeWindow.Closing += (_, _) =>
                 {
                     desktop.MainWindow?.Focus();
@@ -417,7 +461,7 @@ public class WindowInitializer(IWindowProvider provider) : IWindowInitializer, I
                 }
                 else
                 {
-                    Show();
+                    _batchResizeWindow.Activate();
                 }
             });
         }
@@ -456,7 +500,14 @@ public class WindowInitializer(IWindowProvider provider) : IWindowInitializer, I
                 _convertWindow = provider.CreateConvertWindow();
                 _convertWindow.WindowStartupLocation = WindowStartupLocation.CenterOwner;
                 _convertWindow.DataContext = core.MainWindows.ActiveWindow.CurrentValue;
-                _convertWindow.Show(desktop.MainWindow);
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                {
+                    _convertWindow.Show();
+                }
+                else
+                {
+                    _convertWindow.Show(desktop.MainWindow);
+                }
                 _convertWindow.Closing += (_, _) => _convertWindow = null;
             }
             else
@@ -468,6 +519,54 @@ public class WindowInitializer(IWindowProvider provider) : IWindowInitializer, I
                 else
                 {
                     _convertWindow.Activate();
+                }
+            }
+        }
+    }
+
+    public void ShowFileAssociationsWindow()
+    {
+        if (Dispatcher.UIThread.CheckAccess())
+        {
+            Set();
+        }
+        else
+        {
+            Dispatcher.UIThread.InvokeAsync(Set);
+        }
+
+        return;
+
+        void Set()
+        {
+            if (Application.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop ||
+                Application.Current.DataContext is not CoreViewModel core)
+            {
+                return;
+            }
+
+            if (core.AssociationsViewModel is null)
+            {
+                core.AssociationsViewModel = new FileAssociationsViewModel();
+                _fileAssociationsWindow = provider.CreateFileAssociationsWindow();
+                if (_fileAssociationsWindow is null)
+                {
+                    return;
+                }
+
+                _fileAssociationsWindow.DataContext = core;
+                _fileAssociationsWindow.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+                _fileAssociationsWindow.Show(desktop.MainWindow);
+            }
+            else
+            {
+                if (_fileAssociationsWindow.WindowState == WindowState.Minimized)
+                {
+                    WindowFunctions.ShowMinimizedWindow(_fileAssociationsWindow);
+                }
+                else
+                {
+                    _fileAssociationsWindow.Activate();
                 }
             }
         }
@@ -494,7 +593,14 @@ public class WindowInitializer(IWindowProvider provider) : IWindowInitializer, I
             {
                 _printPreviewWindow = provider.CreatePrintPreviewWindow(vm.PrintPreview.PrintWindowConfig);
                 _printPreviewWindow.DataContext = vm;
-                _printPreviewWindow.Show(desktop.MainWindow);
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                {
+                    _printPreviewWindow.Show();
+                }
+                else
+                {
+                    _printPreviewWindow.Show(desktop.MainWindow);
+                }
                 
                 _printPreviewWindow.Closing += (_, _) =>
                 {

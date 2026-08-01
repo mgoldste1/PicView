@@ -1,8 +1,8 @@
+using Avalonia;
 using Avalonia.Interactivity;
 using Avalonia.LogicalTree;
 using PicView.Avalonia.CustomControls;
 using PicView.Avalonia.Functions;
-using PicView.Avalonia.UI;
 using PicView.Core.DebugTools;
 using PicView.Core.ViewModels;
 using R3;
@@ -14,7 +14,12 @@ public partial class QuickEditingDialog : AnimatedPopUp
     private DisposableBag _disposables;
     public QuickEditingDialog()
     {
-        DataContext = UIHelper.GetMainView.DataContext as MainWindowViewModel;
+        if (Application.Current.DataContext is not CoreViewModel core)
+        {
+            return;
+        }
+
+        DataContext = core.MainWindows.ActiveWindow.CurrentValue;
         InitializeComponent();
         Loaded += OnLoaded;
     }

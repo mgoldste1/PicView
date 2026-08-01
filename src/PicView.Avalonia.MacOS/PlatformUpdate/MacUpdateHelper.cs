@@ -1,8 +1,9 @@
 using System.Diagnostics;
+using Avalonia;
 using PicView.Avalonia.WindowBehavior;
 using PicView.Core.DebugTools;
 using PicView.Core.Update;
-using UpdateManager = PicView.Avalonia.Update.UpdateManager;
+using PicView.Core.ViewModels;
 
 namespace PicView.Avalonia.MacOS.PlatformUpdate;
 
@@ -37,8 +38,13 @@ public static class MacUpdateHelper
             var fileName = Path.GetFileName(downloadUrl);
             var tempFilePath = Path.Combine(tempPath, fileName);
             
+            if (Application.Current.DataContext is not CoreViewModel core)
+            {
+                return;
+            }
+            
             // Download the DMG file
-            await UpdateManager.DownloadUpdateFile(downloadUrl, tempFilePath);
+            await UpdateManager.DownloadUpdateFile(core, downloadUrl, tempFilePath);
             
             // Open the DMG file
             var process = new Process

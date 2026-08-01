@@ -10,6 +10,7 @@ public class SettingsSearchData
     public string DeleteFileDialogSearchTags { get; }
     public string SubDirectorySearchTags { get; }
     public string FileHistorySearchTags { get; }
+    public string FullPathInTitleBarySearchTags { get; }
     public string WhenDeletingFileSearchTags { get; }
     public string ThemeSearchTags { get; }
     public string ColorSearchTags { get; }
@@ -50,6 +51,8 @@ public class SettingsSearchData
     public string MouseTouchpadSearchTags { get; }
     public string LanguageSearchTags { get; }
     public string KeybindingsSearchTags { get; }
+    public string FileAssociationSearchTags { get; }
+    
     public SettingsSearchData()
     {
         // Search Initialization
@@ -93,15 +96,24 @@ public class SettingsSearchData
         sb.Append(space);
         sb.Append(TranslationManager.Translation.Folder);
         sb.Append(space);
-        sb.Append("File system");
+        sb.Append(TranslationManager.Translation.FileManagement);
         sb.Append(space);
         sb.Append(TranslationManager.Translation.Navigation);
         SubDirectorySearchTags = sb.ToString();
         
         sb.Append(TranslationManager.Translation.OpenFileHistory);
         sb.Append(space);
-        sb.Append("File system");
+        sb.Append(TranslationManager.Translation.FileManagement);
         FileHistorySearchTags = sb.ToString();
+        
+        sb.Clear();
+        
+        sb.Append(TranslationManager.Translation.ShowFullPathInTitleBar);
+        sb.Append(space);
+        sb.Append(TranslationManager.Translation.File);
+        sb.Append(space);
+        sb.Append(TranslationManager.Translation.FileManagement);
+        FullPathInTitleBarySearchTags = sb.ToString();
         
         sb.Clear();
         
@@ -461,6 +473,11 @@ public class SettingsSearchData
         sb.Append(space);
         sb.Append("Key keybindings");
         KeybindingsSearchTags = sb.ToString();
+                
+        sb.Clear();
+        
+        sb.Append(TranslationManager.Translation.FileAssociations);
+        FileAssociationSearchTags = sb.ToString();
         
         sb.Dispose();
     }

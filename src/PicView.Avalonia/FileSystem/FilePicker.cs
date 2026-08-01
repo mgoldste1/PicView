@@ -2,6 +2,7 @@
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
+using PicView.Avalonia.CustomControls;
 using PicView.Avalonia.StartUp;
 using PicView.Avalonia.Views.UC;
 using PicView.Core.DebugTools;
@@ -13,7 +14,7 @@ namespace PicView.Avalonia.FileSystem;
 
 public static class FilePicker
 {
-    public static async Task SelectAndLoadFile(MainWindowViewModel vm)
+    public static async Task SelectAndLoadFile(MainWindow mainWindow, MainWindowViewModel vm)
     {
         if (vm is null)
         {
@@ -25,6 +26,14 @@ public static class FilePicker
         {
             return;
         }
+
+        var core = await Dispatcher.UIThread.InvokeAsync(() => Application.Current.DataContext as CoreViewModel);
+        var tab = vm.WindowTabs.ActiveTab.CurrentValue;
+        if (!tab.IsInitialized)
+        {
+            await QuickLoad.QuickLoadAsync(mainWindow, core, file, continueFromLeftOff: false).ConfigureAwait(false);
+            return;
+        }
         
         Dispatcher.UIThread.Invoke(() =>
         {
@@ -34,17 +43,21 @@ public static class FilePicker
             }
 
             vm.WindowTabs.ActiveTab.Value.CurrentView.Value = new ImageViewer();
-            TabNavigationInitializer.InitializeNewTab(vm.WindowTabs.ActiveTab.Value, vm);
         });
 
 
         await vm.WindowTabs.LoadFromFileAsync(file).ConfigureAwait(false);
+        vm.TopTitlebarViewModel.DropDownMenu.CloseMenus();
+        vm.TopTitlebarViewModel.DropDownMenu.IsDropDownMenuVisible.Value = false;
     }
 
     public static async Task<string?> SelectFile()
     {
-        var file = await SelectIStorageFile().ConfigureAwait(false);
-        return file?.Path.LocalPath;
+        return await Dispatcher.UIThread.InvokeAsync(async () =>
+        {
+            var file = await SelectIStorageFile().ConfigureAwait(false);
+            return file?.Path.LocalPath;
+        });
     }
 
     private static async Task<IStorageFile?> SelectIStorageFile()
@@ -74,7 +87,7 @@ public static class FilePicker
                     GetFilePickerFileTypes.ArchiveFileType]
             };
 
-            var files = await provider.OpenFilePickerAsync(options);
+            var files = await ExecuteOnUIThread(() => provider.OpenFilePickerAsync(options)).ConfigureAwait(false);
             return files?.Count >= 1 ? files[0] : null;
         }
         catch (Exception e)
@@ -141,23 +154,26 @@ public static class FilePicker
 
     public static async Task<string> SelectDirectory()
     {
-        var provider = GetStorageProvider();
-        if (provider is null) return string.Empty;
-
-        var options = new FolderPickerOpenOptions
+        return await Dispatcher.UIThread.InvokeAsync(async () =>
         {
-            Title = TranslationManager.Translation.Folder + " - PicView",
-            AllowMultiple = false
-        };
-        
-        var directories = await ExecuteOnUIThread(() => provider.OpenFolderPickerAsync(options)).ConfigureAwait(false);
-        
-        if (directories is null || directories.Count <= 0)
-        {
-            return string.Empty;
-        }
-        
-        return directories[0].Path.LocalPath;
+            var provider = GetStorageProvider();
+            if (provider is null) return string.Empty;
+    
+            var options = new FolderPickerOpenOptions
+            {
+                Title = StringExtensions.CombineWithAppName(TranslationManager.Translation.Folder),
+                AllowMultiple = false
+            };
+            
+            var directories = await ExecuteOnUIThread(() => provider.OpenFolderPickerAsync(options));
+            
+            if (directories is null || directories.Count <= 0)
+            {
+                return string.Empty;
+            }
+            
+            return directories[0].Path.LocalPath;
+        });
     }
     
     // Helper methods to reduce code duplication
@@ -169,7 +185,7 @@ public static class FilePicker
             return provider;
         }
 #if DEBUG
-        Console.WriteLine("Missing StorageProvider instance.");
+        DebugHelper.LogDebug(nameof(FilePicker), nameof(GetStorageProvider), "Missing StorageProvider instance.");
 #endif
         return null;
 

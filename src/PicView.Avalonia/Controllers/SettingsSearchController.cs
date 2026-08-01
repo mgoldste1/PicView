@@ -100,6 +100,7 @@ public class SettingsSearchController(SettingsView view) : IDisposable
     public void ClosePopup()
     {
         view.SuggestionsPopup.Close();
+        view.FilterBox.Text = string.Empty;
     }
 
     public void OnViewModelCategoryChanged(SettingsCategory category)
@@ -663,11 +664,6 @@ public class SettingsSearchController(SettingsView view) : IDisposable
     private void ScrollToCategory(SettingsCategory category)
     {
         if (_sectionsMap == null || !_sectionsMap.TryGetValue(category, out var section))
-        {
-            return;
-        }
-
-        if (Math.Abs(view.ContentScrollViewer.Offset.Y - section.Bounds.Y) < 1.0)
         {
             return;
         }
