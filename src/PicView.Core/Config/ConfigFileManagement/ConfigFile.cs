@@ -2,7 +2,7 @@
 
 public class ConfigFile(string configFileName)
 {
-    public const string ConfigFolder = "Ruben2776/PicView/Config";
+    public const string ConfigFolder = "PicView/Config";
     
     public string ConfigFileName { get; } = configFileName;
     private string ConfigPath => Path.Combine(ConfigFolder, ConfigFileName);

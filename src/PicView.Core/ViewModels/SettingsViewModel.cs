@@ -42,6 +42,7 @@ public class SettingsViewModel : IDisposable
             new SettingsCategoryItem(translation.Zoom, "ZoomImage", SettingsCategory.Zoom),
             new SettingsCategoryItem(translation.Mouse, "MouseWheelIcon", SettingsCategory.Mouse),
             new SettingsCategoryItem(translation.Language, "LanguageSettingsImage", SettingsCategory.Language),
+            new SettingsCategoryItem(new BindableReactiveProperty<string?>("Labeling"), "StarFilledDrawingImage", SettingsCategory.Labeling),
             new SettingsCategoryItem(translation.FileAssociations, "FileAssociationImage", SettingsCategory.FileAssociations)
         ];
 
@@ -83,6 +84,39 @@ public class SettingsViewModel : IDisposable
         IsIncludingSubdirectories.Subscribe(x => Settings.Sorting.IncludeSubDirectories = x).AddTo(ref _disposables);
         IsShowingTaskbarProgress.Subscribe(x => Settings.UIProperties.IsTaskbarProgressEnabled = x).AddTo(ref _disposables);
         IsFileHistoryEnabled.Subscribe(x => Settings.Navigation.IsFileHistoryEnabled = x).AddTo(ref _disposables);
+
+        // Labeling Properties
+        Settings.Labeling ??= new LabelSettings();
+        Observable.EveryValueChanged(this, x => x.IsAutoAdvancingAfterLabel.CurrentValue)
+            .SubscribeAwait(async (x, _) =>
+            {
+                Settings.Labeling.AutoAdvanceAfterLabel = x;
+                await SaveSettingsAsync();
+            }, DebugHelper.LogError(nameof(SettingsViewModel), nameof(IsAutoAdvancingAfterLabel))).AddTo(ref _disposables);
+        Observable.EveryValueChanged(this, x => x.IsStoringOriginalInMetadata.CurrentValue)
+            .SubscribeAwait(async (x, _) =>
+            {
+                Settings.Labeling.StoreOriginalInMetadata = x;
+                await SaveSettingsAsync();
+            }, DebugHelper.LogError(nameof(SettingsViewModel), nameof(IsStoringOriginalInMetadata))).AddTo(ref _disposables);
+        Observable.EveryValueChanged(this, x => x.RelabelPolicyIndex.CurrentValue)
+            .SubscribeAwait(async (x, _) =>
+            {
+                Settings.Labeling.RelabelPolicy = (RelabelPolicy)x;
+                await SaveSettingsAsync();
+            }, DebugHelper.LogError(nameof(SettingsViewModel), nameof(RelabelPolicyIndex))).AddTo(ref _disposables);
+        Observable.EveryValueChanged(this, x => x.LabelModeIndex.CurrentValue)
+            .SubscribeAwait(async (x, _) =>
+            {
+                Settings.Labeling.Mode = (LabelMode)x;
+                await SaveSettingsAsync();
+            }, DebugHelper.LogError(nameof(SettingsViewModel), nameof(LabelModeIndex))).AddTo(ref _disposables);
+        Observable.EveryValueChanged(this, x => x.LabelSeparator.CurrentValue)
+            .SubscribeAwait(async (x, _) =>
+            {
+                Settings.Labeling.LabelSeparator = string.IsNullOrEmpty(x) ? "_" : x;
+                await SaveSettingsAsync();
+            }, DebugHelper.LogError(nameof(SettingsViewModel), nameof(LabelSeparator))).AddTo(ref _disposables);
         
         ToggleUsingTouchpadCommand = new ReactiveCommand(_ =>
         {
@@ -217,6 +251,22 @@ public class SettingsViewModel : IDisposable
     public BindableReactiveProperty<bool> IsIncludingSubdirectories { get; } = new(Settings.Sorting.IncludeSubDirectories);
     public BindableReactiveProperty<bool> IsShowingTaskbarProgress { get; } = new(Settings.UIProperties.IsTaskbarProgressEnabled);
     public BindableReactiveProperty<bool> IsFileHistoryEnabled { get; } = new(Settings.Navigation.IsFileHistoryEnabled);
+
+    // Labeling
+    public BindableReactiveProperty<bool> IsAutoAdvancingAfterLabel { get; } =
+        new((Settings.Labeling ?? new LabelSettings()).AutoAdvanceAfterLabel);
+
+    public BindableReactiveProperty<bool> IsStoringOriginalInMetadata { get; } =
+        new((Settings.Labeling ?? new LabelSettings()).StoreOriginalInMetadata);
+
+    public BindableReactiveProperty<int> RelabelPolicyIndex { get; } =
+        new((int)(Settings.Labeling ?? new LabelSettings()).RelabelPolicy);
+
+    public BindableReactiveProperty<int> LabelModeIndex { get; } =
+        new((int)(Settings.Labeling ?? new LabelSettings()).Mode);
+
+    public BindableReactiveProperty<string> LabelSeparator { get; } =
+        new((Settings.Labeling ?? new LabelSettings()).LabelSeparator);
 
     public BindableReactiveProperty<bool> IsShowingRecycleDialog { get; } =
         new(Settings.UIProperties.ShowRecycleConfirmation);
@@ -688,6 +738,7 @@ public enum SettingsCategory
     Zoom,
     Mouse,
     Language,
+    Labeling,
     Keybindings,
     FileAssociations
 }

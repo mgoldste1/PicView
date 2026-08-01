@@ -69,6 +69,41 @@ public class SharedImageCache : IImageCache
         _ownerContexts.TryRemove(ownerId, out _);
     }
 
+    public void EvictPath(string fullPath)
+    {
+        if (string.IsNullOrEmpty(fullPath))
+        {
+            return;
+        }
+
+        // Remove from every owner dictionary
+        foreach (var dict in _ownerDictionaries.Values)
+        {
+            var keysToRemove = new List<int>();
+            foreach (var kvp in dict)
+            {
+                if (_pathLookup.Comparer.Equals(kvp.Value.ImageModel.FileInfo.FullName, fullPath))
+                {
+                    keysToRemove.Add(kvp.Key);
+                }
+            }
+
+            foreach (var key in keysToRemove)
+            {
+                dict.Remove(key, out _);
+            }
+        }
+
+        // Remove the fast-lookup entry
+        _pathLookup.TryRemove(fullPath, out _);
+
+        // Remove and dispose any pending-disposal entry so it cannot be resurrected
+        if (_disposalList.TryRemove(fullPath, out var pending))
+        {
+            DisposeHelper(pending.Item);
+        }
+    }
+
     public void Resynchronize(uint ownerId, IReadOnlyList<FileInfo> files)
     {
         if (!_ownerDictionaries.TryGetValue(ownerId, out var dict))
@@ -350,7 +385,7 @@ public class SharedImageCache : IImageCache
     #endregion
 
     #region Disposal and ressurection
-    
+
     private bool TryResurrect(string path, out PreLoadValue? value)
     {
         // Check if it's in the disposal list

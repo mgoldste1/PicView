@@ -218,6 +218,7 @@ public class TiffNavigationTests : IDisposable
         public void RegisterOwner(string ownerId) { }
         public void Clear(TabViewModel tab, int currentIndex, string directory, IReadOnlyList<FileInfo> files) { }
         public void TryRemove(string ownerId, int index) { }
+        public void EvictPath(string fullPath) { }
         public void Resynchronize(string ownerId, IReadOnlyList<FileInfo> files) { }
         public ValueTask<bool> WaitForLoadingCompleteAsync(string ownerId, int index) => ValueTask.FromResult(false);
     }

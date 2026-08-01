@@ -5,5 +5,12 @@
         <VersionSuffix>dev-build</VersionSuffix>
         <AssemblyVersion>5.0.0.0</AssemblyVersion>
         <FileVersion>5.0.0</FileVersion>
+        <!--
+          SYSLIB5007: 'System.Runtime.CompilerServices.AsyncHelpers' is for evaluation purposes only.
+          The current SDK emits this evaluation-only helper for certain 'await' patterns and reports it
+          as an error across the whole codebase. Suppress it solution-wide as recommended by
+          https://aka.ms/dotnet-warnings/SYSLIB5007
+        -->
+        <NoWarn>$(NoWarn);SYSLIB5007</NoWarn>
     </PropertyGroup>
 </Project>

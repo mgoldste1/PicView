@@ -70,7 +70,12 @@ public static class MacOsKeybindings
                                                 "Cmd+T": "NewTab",
                                                 "Cmd+W": "CloseTab",
                                                 "Cmd+PageUp": "NextArchive",
-                                                "Cmd+PageDown": "PrevArchive"
+                                                "Cmd+PageDown": "PrevArchive",
+                                                "D1": "Label:red",
+                                                "D2": "Label:green",
+                                                "D3": "Label:blue",
+                                                "D4": "Label:yellow",
+                                                "D0": "ClearLabel"
                                               }
                                               """;
 }

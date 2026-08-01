@@ -266,6 +266,13 @@ public static class WindowResizing
         {
             return null;
         }
+
+        // Controls may not be wired up yet during startup (UIHelper.SetControls runs after the
+        // initial image subscription fires); skip resizing until the main view is available.
+        if (UIHelper.GetMainView is null)
+        {
+            return null;
+        }
         var (containerWidth, containerHeight) = GetWindowSize();
         if (Settings.ImageScaling.ShowImageSideBySide && secondWidth > 0 && secondHeight > 0)
         {

@@ -96,7 +96,8 @@ public class ImageIterator(IImageCache cache, IThumbnailCache thumbCache, IThumb
 
         CurrentIndex = index;
         var targetFile = Files[index];
-        if (Cache.TryGet(targetFile, out var preLoadValue))
+        if (Cache.TryGet(targetFile, out var preLoadValue) &&
+            preLoadValue is not { IsLoading: false, ImageModel.Image: null })
         {
             if (preLoadValue is { IsLoading: false, ImageModel.Image: not null })
             {

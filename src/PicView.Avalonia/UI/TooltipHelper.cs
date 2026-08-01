@@ -33,40 +33,38 @@ public static class TooltipHelper
     }
     private static async ValueTask ShowToolTipAsync(string message, bool center, TimeSpan interval, CancellationToken cancellationToken)
     {
-        // 1. Set the text and make the control visible
-        UIHelper.GetToolTipMessage.ToolTipMessageText.Text = message;
-        UIHelper.GetToolTipMessage.IsVisible = true;
-        
-        UIHelper.GetToolTipMessage.Margin = center ? new Thickness(0) : new Thickness(0, 0, 0, 15);
-        UIHelper.GetToolTipMessage.VerticalAlignment =
-            center ? VerticalAlignment.Center : VerticalAlignment.Bottom;
-
-        // 2. Create and run the fade-in animation
-        var fadeIn = AnimationsHelper.OpacityAnimation(0, 1, Speed);
-        await fadeIn.RunAsync(UIHelper.GetToolTipMessage, cancellationToken);
-
-        // Exit if a new message cancelled this task
-        if (cancellationToken.IsCancellationRequested) return;
-
-        // 3. Wait for a few seconds
-        await Task.Delay(interval, cancellationToken);
-
-        // Exit if a new message cancelled this task
-        if (cancellationToken.IsCancellationRequested)
+        try
         {
-            // If cancelled here, we still want to fade out smoothly
-            var instantFadeOut = AnimationsHelper.OpacityAnimation(UIHelper.GetToolTipMessage.Opacity, 0, Speed);
-            await instantFadeOut.RunAsync(UIHelper.GetToolTipMessage, cancellationToken);
-            UIHelper.GetToolTipMessage.IsVisible = false;
-            return;
-        }
+            // 1. Set the text and make the control visible
+            UIHelper.GetToolTipMessage.ToolTipMessageText.Text = message;
+            UIHelper.GetToolTipMessage.IsVisible = true;
 
-        // 4. Create and run the fade-out animation
-        var fadeOut = AnimationsHelper.OpacityAnimation(1, 0, 0.3);
-        await fadeOut.RunAsync(UIHelper.GetToolTipMessage, cancellationToken);
-            
-        // 5. Hide the control
-        UIHelper.GetToolTipMessage.IsVisible = false;
+            UIHelper.GetToolTipMessage.Margin = center ? new Thickness(0) : new Thickness(0, 0, 0, 15);
+            UIHelper.GetToolTipMessage.VerticalAlignment =
+                center ? VerticalAlignment.Center : VerticalAlignment.Bottom;
+
+            // 2. Create and run the fade-in animation
+            var fadeIn = AnimationsHelper.OpacityAnimation(0, 1, Speed);
+            await fadeIn.RunAsync(UIHelper.GetToolTipMessage, cancellationToken);
+
+            // Exit if a new message cancelled this task
+            if (cancellationToken.IsCancellationRequested) return;
+
+            // 3. Wait for a few seconds
+            await Task.Delay(interval, cancellationToken);
+
+            // 4. Create and run the fade-out animation
+            var fadeOut = AnimationsHelper.OpacityAnimation(1, 0, 0.3);
+            await fadeOut.RunAsync(UIHelper.GetToolTipMessage, cancellationToken);
+
+            // 5. Hide the control
+            UIHelper.GetToolTipMessage.IsVisible = false;
+        }
+        catch (OperationCanceledException)
+        {
+            // A newer message cancelled this one via Switch(); the newer message
+            // now owns the tooltip visuals, so just exit quietly.
+        }
     }
     
     public static async Task ShowTooltipMessageContinuallyAsync(object message, bool center, TimeSpan interval)

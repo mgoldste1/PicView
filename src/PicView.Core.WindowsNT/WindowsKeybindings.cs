@@ -3,7 +3,7 @@
 public static class WindowsKeybindings
 {
     public const string DefaultKeybindings = """
-                                             {
+                                               {
                                                "Esc": "Close",
                                                "F1": "AboutWindow",
                                                "F2": "Rename",
@@ -77,6 +77,11 @@ public static class WindowsKeybindings
                                                "Ctrl+F": "Search",
                                                "Ctrl+PageUp": "NextArchive",
                                                "Ctrl+PageDown": "PrevArchive",
-                                             }
-                                             """;
+                                               "D1": "Label:red",
+                                               "D2": "Label:green",
+                                               "D3": "Label:blue",
+                                               "D4": "Label:yellow",
+                                               "D0": "ClearLabel"
+                                               }
+                                               """;
 }

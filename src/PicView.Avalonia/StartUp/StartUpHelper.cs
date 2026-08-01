@@ -31,6 +31,10 @@ public static class StartUpHelper
     public static void StartWithArguments(CoreViewModel vm, bool settingsExists,
         IClassicDesktopStyleApplicationLifetime desktop, MainWindow window)
     {
+        // Assign the main window up front so that services relying on it (e.g. UIHelper.GetFrameProvider)
+        // resolve correctly while the initial tab and its subscriptions are being created below.
+        desktop.MainWindow = window;
+
         var args = Environment.GetCommandLineArgs();
         if (args.Length > 1)
         {
@@ -205,14 +209,12 @@ public static class StartUpHelper
         {
             Task.Run(async() =>
             {
-                if (defaultKeybindings)
-                {
-                    KeybindingManager.SetDefaultKeybindings(vm.PlatformService);
-                }
-                else
-                {
-                    await KeybindingManager.LoadKeybindings(vm.PlatformService);
-                }
+                // LoadKeybindings already falls back to platform defaults when no
+                // keybindings file exists, so always load from disk here. Using
+                // SetDefaultKeybindings unconditionally would discard the user's
+                // saved (and renamed) keybindings on every launch.
+                _ = defaultKeybindings;
+                await KeybindingManager.LoadKeybindings(vm.PlatformService);
                 vm.MainWindows.ActiveWindow.Value.Mapper =
                     new FunctionsMapper(vm.MainWindows.ActiveWindow.CurrentValue, window);
                 FileHistoryManager.Initialize();

@@ -165,6 +165,7 @@ public class FileWatcherServiceTests : IDisposable
         public void Preload(uint ownerId, int currentIndex, bool reversed, IReadOnlyList<FileInfo> files, CancellationToken token) { }
         public void Clear(TabViewModel tab, int currentIndex, string directory, IReadOnlyList<FileInfo> files) { }
         public void TryRemove(uint ownerId, int index) { }
+        public void EvictPath(string fullPath) { }
         public ValueTask<bool> WaitForLoadingCompleteAsync(uint ownerId, int index) => ValueTask.FromResult(false);
     }
 

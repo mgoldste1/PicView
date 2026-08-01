@@ -185,8 +185,28 @@ public class FunctionsMapper(MainWindowViewModel vm, Window window) : IFunctions
             "ColorPicker" => ColorPicker,
             "Restart" => Restart,
 
-            _ => null
+            // Labeling
+            "ClearLabel" => ClearLabel,
+
+            _ => GetDynamicFunction(functionName)
         };
+    }
+
+    /// <summary>
+    /// Handles dynamic/parameterized action names (e.g. "Label:red").
+    /// </summary>
+    private Func<ValueTask>? GetDynamicFunction(string functionName)
+    {
+        if (functionName.StartsWith("Label:", StringComparison.OrdinalIgnoreCase))
+        {
+            var labelText = functionName["Label:".Length..].Trim();
+            if (!string.IsNullOrEmpty(labelText))
+            {
+                return () => ApplyLabel(labelText);
+            }
+        }
+
+        return null;
     }
 
     #region Functions
@@ -902,6 +922,16 @@ public class FunctionsMapper(MainWindowViewModel vm, Window window) : IFunctions
 
     public async ValueTask Set5Star() =>
         await SetExifRatingHelper.Set5Star(vm);
+
+    #endregion
+
+    #region Labeling
+
+    public async ValueTask ApplyLabel(string label) =>
+        await LabelHelper.ApplyLabelAsync(vm, label);
+
+    public async ValueTask ClearLabel() =>
+        await LabelHelper.ClearLabelAsync(vm);
 
     #endregion
 

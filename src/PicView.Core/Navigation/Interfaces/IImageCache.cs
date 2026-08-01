@@ -85,6 +85,13 @@ public interface IImageCache
     void TryRemove(uint ownerId, int index);
 
     /// <summary>
+    /// Fully evicts and disposes any cached entry for the given file path across all owners,
+    /// the fast path lookup, and the pending disposal queue. Used when a file re-enters a
+    /// watched folder so a stale (possibly disposed) image cannot be resurrected.
+    /// </summary>
+    void EvictPath(string fullPath);
+
+    /// <summary>
     /// Resynchronizes the cache for a specific owner when the file list changes (e.g., sorting).
     /// </summary>
     void Resynchronize(uint ownerId, IReadOnlyList<FileInfo> files);

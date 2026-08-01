@@ -1,0 +1,239 @@
+<UserControl
+	x:Class="PicView.Avalonia.Views.Config.LabelingView"
+	xmlns="https://github.com/avaloniaui"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:customControls="clr-namespace:PicView.Avalonia.CustomControls"
+	xmlns:viewModels="clr-namespace:PicView.Core.ViewModels;assembly=PicView.Core"
+	xmlns:models="clr-namespace:PicView.Core.Models;assembly=PicView.Core"
+	x:DataType="viewModels:CoreViewModel">
+
+	<StackPanel HorizontalAlignment="Center" Orientation="Vertical">
+
+		<StackPanel Classes="searchHeader">
+			<Image
+				Width="18"
+				Height="18"
+				Source="{StaticResource StarFilledDrawingImage}" />
+			<TextBlock
+				Margin="0,20,0,20"
+				Classes="txt bold searchHeader"
+				Text="Labeling" />
+		</StackPanel>
+
+		<!--  Auto-advance after labeling  -->
+		<Border Classes="searchBorder">
+			<customControls:TextToggleButton
+				x:Name="AutoAdvanceToggleButton"
+				Classes="altHover settingsToggleButton"
+				IsChecked="{CompiledBinding SettingsViewModel.IsAutoAdvancingAfterLabel.Value,
+											Mode=TwoWay}"
+				Text="Move to next image after applying a label"
+				ToolTip.Tip="When enabled, applying a label automatically advances to the next image in the folder." />
+		</Border>
+
+		<!--  Store original filename in metadata  -->
+		<Border Classes="searchBorder">
+			<customControls:TextToggleButton
+				x:Name="StoreOriginalToggleButton"
+				Classes="altHover settingsToggleButton"
+				IsChecked="{CompiledBinding SettingsViewModel.IsStoringOriginalInMetadata.Value,
+											Mode=TwoWay}"
+				Text="Store original filename in image metadata"
+				ToolTip.Tip="Saves the original filename in EXIF metadata the first time an image is labeled." />
+		</Border>
+
+		<!--  Relabel policy  -->
+		<Border Classes="searchBorder">
+			<StackPanel>
+				<TextBlock
+					MaxWidth="300"
+					Margin="0,10,0,10"
+					Classes="txt bold"
+					Text="When an image is already labeled" />
+				<ComboBox
+					Background="{DynamicResource SecondaryBackgroundColor}"
+					BorderBrush="{DynamicResource MainBorderColor}"
+					BorderThickness="1"
+					FontFamily="/Assets/Fonts/Roboto-Medium.ttf#Roboto"
+					Foreground="{DynamicResource MainTextColor}"
+					Margin="0,6,0,15"
+					Padding="5,7,0,7"
+					SelectedIndex="{CompiledBinding SettingsViewModel.RelabelPolicyIndex.Value,
+													Mode=TwoWay}"
+					Width="300">
+					<ComboBoxItem Content="Replace the existing label" Foreground="{DynamicResource MainTextColor}" />
+					<ComboBoxItem Content="Block relabeling" Foreground="{DynamicResource MainTextColor}" />
+					<ComboBoxItem Content="Prompt before relabeling" Foreground="{DynamicResource MainTextColor}" />
+				</ComboBox>
+			</StackPanel>
+		</Border>
+
+		<!--  Label mode  -->
+		<Border Classes="searchBorder">
+			<StackPanel>
+				<TextBlock
+					MaxWidth="300"
+					Margin="0,10,0,10"
+					Classes="txt bold"
+					Text="How labels are applied" />
+				<ComboBox
+					Background="{DynamicResource SecondaryBackgroundColor}"
+					BorderBrush="{DynamicResource MainBorderColor}"
+					BorderThickness="1"
+					FontFamily="/Assets/Fonts/Roboto-Medium.ttf#Roboto"
+					Foreground="{DynamicResource MainTextColor}"
+					Margin="0,6,0,15"
+					Padding="5,7,0,7"
+					SelectedIndex="{CompiledBinding SettingsViewModel.LabelModeIndex.Value,
+													Mode=TwoWay}"
+					Width="300">
+					<ComboBoxItem Content="Append to filename (e.g. photo_red.jpg)" Foreground="{DynamicResource MainTextColor}" />
+					<ComboBoxItem Content="Move to a subfolder (e.g. red/photo.jpg)" Foreground="{DynamicResource MainTextColor}" />
+				</ComboBox>
+			</StackPanel>
+		</Border>
+
+		<!--  Label separator  -->
+		<Border Classes="searchBorder">
+			<StackPanel>
+				<TextBlock
+					MaxWidth="300"
+					Margin="0,10,0,10"
+					Classes="txt bold"
+					Text="Separator pattern" />
+				<TextBlock
+					MaxWidth="300"
+					Margin="0,0,0,10"
+					Classes="txt"
+					FontSize="12"
+					Opacity=".8"
+					TextWrapping="Wrap"
+					Text="Text inserted before the label in filename mode. Use {LABEL} for the label, or a full template with {FILENAME} to control order, e.g. {FILENAME}_{LABEL} or {LABEL}_{FILENAME}." />
+				<TextBox
+					Background="{DynamicResource SecondaryBackgroundColor}"
+					BorderBrush="{DynamicResource MainBorderColor}"
+					BorderThickness="1"
+					CornerRadius="4"
+					FontFamily="/Assets/Fonts/Roboto-Regular.ttf#Roboto"
+					Foreground="{DynamicResource MainTextColor}"
+					Margin="0,0,0,15"
+					Padding="7"
+					Text="{CompiledBinding SettingsViewModel.LabelSeparator.Value,
+										   Mode=TwoWay}"
+					Width="300" />
+			</StackPanel>
+		</Border>
+
+		<!--  Label categories editor  -->
+		<Border Classes="searchBorder">
+			<StackPanel>
+				<TextBlock
+					MaxWidth="300"
+					Margin="0,10,0,10"
+					Classes="txt bold"
+					Text="Label categories" />
+				<TextBlock
+					MaxWidth="300"
+					Margin="0,0,0,10"
+					Classes="txt"
+					FontSize="12"
+					Opacity=".8"
+					TextWrapping="Wrap"
+					Text="Define the labels you can apply and the number key (1-9) that applies each one." />
+
+				<!--  Existing categories  -->
+				<ItemsControl x:Name="LabelCategoriesItemsControl" Width="300">
+					<ItemsControl.ItemTemplate>
+						<DataTemplate x:DataType="models:LabelCategoryItem">
+							<Grid Margin="0,0,0,6" ColumnDefinitions="60,*,Auto">
+								<Border
+									Grid.Column="0"
+									Background="{DynamicResource SecondaryBackgroundColor}"
+									BorderBrush="{DynamicResource MainBorderColor}"
+									BorderThickness="1"
+									CornerRadius="4"
+									Padding="6,4"
+									Margin="0,0,6,0">
+									<TextBlock
+										Classes="txt"
+										HorizontalAlignment="Center"
+										Text="{CompiledBinding Key}" />
+								</Border>
+								<TextBox
+									Grid.Column="1"
+									Background="{DynamicResource SecondaryBackgroundColor}"
+									BorderBrush="{DynamicResource MainBorderColor}"
+									BorderThickness="1"
+									CornerRadius="4"
+									FontFamily="/Assets/Fonts/Roboto-Regular.ttf#Roboto"
+									Foreground="{DynamicResource MainTextColor}"
+									Margin="0,0,6,0"
+									Padding="6,4"
+									VerticalAlignment="Center"
+									Text="{CompiledBinding Name}"
+									Tag="{CompiledBinding Key}"
+									LostFocus="OnRenameLabelCommit"
+									KeyDown="OnRenameLabelKeyDown" />
+								<Button
+									Grid.Column="2"
+									Classes="altHover"
+									Padding="8,4"
+									Content="Remove"
+									Click="OnRemoveLabelClick"
+									Tag="{CompiledBinding Key}" />
+							</Grid>
+						</DataTemplate>
+					</ItemsControl.ItemTemplate>
+				</ItemsControl>
+
+				<!--  Add new category  -->
+				<Grid Margin="0,10,0,15" Width="300" ColumnDefinitions="70,*,Auto">
+					<ComboBox
+						x:Name="NewLabelKeyComboBox"
+						Grid.Column="0"
+						Background="{DynamicResource SecondaryBackgroundColor}"
+						BorderBrush="{DynamicResource MainBorderColor}"
+						BorderThickness="1"
+						Foreground="{DynamicResource MainTextColor}"
+						Margin="0,0,6,0"
+						Padding="5,7,0,7">
+						<ComboBox.Styles>
+							<Style Selector="ComboBoxItem">
+								<Setter Property="Foreground" Value="{DynamicResource MainTextColor}" />
+							</Style>
+						</ComboBox.Styles>
+					</ComboBox>
+					<TextBox
+						x:Name="NewLabelNameTextBox"
+						Grid.Column="1"
+						Background="{DynamicResource SecondaryBackgroundColor}"
+						BorderBrush="{DynamicResource MainBorderColor}"
+						BorderThickness="1"
+						CornerRadius="4"
+						FontFamily="/Assets/Fonts/Roboto-Regular.ttf#Roboto"
+						Foreground="{DynamicResource MainTextColor}"
+						Margin="0,0,6,0"
+						Padding="7"
+						Watermark="Label name" />
+					<Button
+						Grid.Column="2"
+						Classes="altHover"
+						Padding="10,7"
+						Content="Add"
+						Click="OnAddLabelClick" />
+				</Grid>
+
+				<TextBlock
+					x:Name="LabelEditorMessage"
+					MaxWidth="300"
+					Margin="0,0,0,10"
+					Classes="txt"
+					FontSize="12"
+					Foreground="{DynamicResource SecondaryTextColor}"
+					IsVisible="False"
+					TextWrapping="Wrap" />
+			</StackPanel>
+		</Border>
+
+	</StackPanel>
+</UserControl>

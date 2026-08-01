@@ -1,4 +1,5 @@
 ﻿using PicView.Core.Config.ConfigFileManagement;
+using PicView.Core.FileHandling;
 
 namespace PicView.Core.Keybindings;
 
@@ -6,7 +7,7 @@ public static class KeybindingFunctions
 {
     public static KeyBindingsConfiguration? KeyBindingsConfiguration { get; private set; }
     public static string CurrentKeybindingsPath => KeyBindingsConfiguration?.CorrectPath ?? string.Empty;
-    
+
     public static async Task SaveKeyBindingsFile(string json)
     {
         try
@@ -16,11 +17,13 @@ public static class KeybindingFunctions
             {
                 KeyBindingsConfiguration.CorrectPath = ConfigFileManager.ResolveDefaultConfigPath(KeyBindingsConfiguration);
             }
+            FileHelper.EnsureDirectoryExists(CurrentKeybindingsPath);
             await using var writer = new StreamWriter(CurrentKeybindingsPath);
             await writer.WriteAsync(json).ConfigureAwait(false);
         }
         catch (UnauthorizedAccessException)
         {
+            FileHelper.EnsureDirectoryExists(KeyBindingsConfiguration.RoamingConfigPath);
             await using var writer = new StreamWriter(KeyBindingsConfiguration.RoamingConfigPath);
             await writer.WriteAsync(json).ConfigureAwait(false);
         }

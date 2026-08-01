@@ -21,6 +21,51 @@ public class FileWatcherService(
     private readonly Lock _lock = new();
     private readonly Func<string, string, int> _stringComparer = stringComparer ?? throw new ArgumentNullException(nameof(stringComparer));
 
+    // Tracks rename target paths that were initiated by the application itself (e.g. labeling).
+    // The FileSystemWatcher raises a Renamed event for these, but the app has already updated
+    // the tab/iterator state, so re-synchronizing here would fight with app-driven navigation
+    // (such as auto-advance after applying a label). Entries are consumed on the first matching
+    // event and expire after a short window in case the event never arrives.
+    private static readonly ConcurrentDictionary<string, DateTime> _selfInitiatedRenames =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    private static readonly TimeSpan _selfInitiatedRenameTtl = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// Registers a rename that the application performs itself so the watcher ignores the
+    /// resulting Renamed event and does not override app-driven navigation state.
+    /// </summary>
+    public static void SuppressNextRename(string newFullPath)
+    {
+        if (string.IsNullOrEmpty(newFullPath))
+        {
+            return;
+        }
+
+        var now = DateTime.UtcNow;
+
+        // Opportunistically drop stale entries.
+        foreach (var kvp in _selfInitiatedRenames)
+        {
+            if (now - kvp.Value > _selfInitiatedRenameTtl)
+            {
+                _selfInitiatedRenames.TryRemove(kvp.Key, out _);
+            }
+        }
+
+        _selfInitiatedRenames[newFullPath] = now;
+    }
+
+    private static bool ConsumeSelfInitiatedRename(string newFullPath)
+    {
+        if (!_selfInitiatedRenames.TryRemove(newFullPath, out var timestamp))
+        {
+            return false;
+        }
+
+        return DateTime.UtcNow - timestamp <= _selfInitiatedRenameTtl;
+    }
+
     // Maps Directory Path -> (Watcher, Subscribers)
     private readonly
         ConcurrentDictionary<string, (FileSystemWatcher Watcher, IDisposable Subscription,
@@ -167,6 +212,12 @@ public class FileWatcherService(
 
         var newFile = new FileInfo(e.FullPath);
 
+        // If this file previously left the folder (e.g. it was moved to a label subfolder
+        // and back), any cached image for it may have been disposed by the lazy disposal
+        // queue. Evict it so navigation forces a fresh load instead of resurrecting a
+        // disposed bitmap (which renders blank and spams ObjectDisposedException).
+        _cache.EvictPath(newFile.FullName);
+
         var files = tab.ImageIterator.Files as List<FileInfo>;
         var insertionIndex = -1;
         if (files != null)
@@ -292,6 +343,13 @@ public class FileWatcherService(
             return;
         }
 
+        // If the app performed this rename (e.g. applying a label), it has already updated
+        // the tab/iterator and may have navigated away; skip to avoid overriding that state.
+        if (ConsumeSelfInitiatedRename(e.FullPath))
+        {
+            return;
+        }
+
         thumbnailCache?.Remove(e.OldFullPath);
 
         var newFileInfo = new FileInfo(e.FullPath);
@@ -309,11 +367,25 @@ public class FileWatcherService(
         if (removeIndex >= 0)
         {
             files.RemoveAt(removeIndex);
-            tab.Gallery.GalleryItems.RemoveAt(removeIndex);
+
+            var galleryItems = tab.Gallery.GalleryItems;
+            var galleryRemoveIndex = -1;
+            for (var i = 0; i < galleryItems.Count; i++)
+            {
+                if (galleryItems[i].FileInfo?.FullName.Equals(e.OldFullPath, StringComparison.OrdinalIgnoreCase) ?? false)
+                {
+                    galleryRemoveIndex = i;
+                    break;
+                }
+            }
+            if (galleryRemoveIndex >= 0)
+            {
+                galleryItems.RemoveAt(galleryRemoveIndex);
+            }
         }
         var insertionIndex = FileSortOrder.InsertSorted(files, newFileInfo, _stringComparer);
 
-        if (insertionIndex >= 0 && insertionIndex > tab.Gallery.GalleryItems.Count)
+        if (insertionIndex >= 0 && insertionIndex <= tab.Gallery.GalleryItems.Count)
         {
             var item = new GalleryItemViewModel
             {
@@ -380,7 +452,36 @@ public class FileWatcherService(
     {
         var newFile = new FileInfo(e.FullPath);
         var previousFile = tab.Model?.FileInfo;
-        if (newFile.Length == previousFile.Length)
+
+        long newLength;
+        try
+        {
+            // The file may be mid-write (e.g. metadata rewrite via temp-file swap) or
+            // transiently unavailable. Reading Length can throw FileNotFoundException/
+            // IOException even when Exists appeared true a moment ago (TOCTOU race).
+            newLength = newFile.Length;
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or IOException or UnauthorizedAccessException)
+        {
+            // The file isn't readable right now; ignore this notification. A later
+            // event (or rename/delete handler) will reconcile the state.
+            return;
+        }
+
+        long previousLength = -78;
+        if (previousFile is not null)
+        {
+            try
+            {
+                previousLength = previousFile.Length;
+            }
+            catch (Exception ex) when (ex is FileNotFoundException or IOException or UnauthorizedAccessException)
+            {
+                previousLength = -78;
+            }
+        }
+
+        if (newLength == previousLength)
         {
             // Don't do anything if the file size hasn't changed
             return;

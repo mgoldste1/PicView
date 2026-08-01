@@ -155,6 +155,7 @@ public class NavigationServiceTests
         public void RegisterOwner(uint ownerId) { }
         public void Clear(TabViewModel tab, int currentIndex, string directory, IReadOnlyList<FileInfo> files) { }
         public void TryRemove(uint ownerId, int index) { }
+        public void EvictPath(string fullPath) { }
         public void Resynchronize(uint ownerId, IReadOnlyList<FileInfo> files) { }
         public ValueTask<bool> WaitForLoadingCompleteAsync(uint ownerId, int index) => ValueTask.FromResult(false);
     }

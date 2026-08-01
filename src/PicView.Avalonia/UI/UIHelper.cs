@@ -11,6 +11,7 @@ using PicView.Avalonia.Views.Main;
 using PicView.Avalonia.Views.UC;
 using PicView.Avalonia.Views.UC.Buttons;
 using PicView.Avalonia.WindowBehavior;
+using PicView.Core.Config;
 using PicView.Core.FileHistory;
 using PicView.Core.ViewModels;
 using R3.Avalonia;
@@ -121,6 +122,23 @@ public static class UIHelper
     
     public static async Task OpenLastFile(MainWindowViewModel vm)
     {
+        var lastFilePath = !string.IsNullOrEmpty(Settings.StartUp.LastFile)
+            ? Settings.StartUp.LastFile
+            : FileHistoryManager.GetLastEntry();
+
+        // If the last file is a local path that no longer exists, show a tooltip and abort.
+        if (!string.IsNullOrEmpty(lastFilePath)
+            && !lastFilePath.StartsWith("http", StringComparison.OrdinalIgnoreCase)
+            && !File.Exists(lastFilePath)
+            && !Directory.Exists(lastFilePath))
+        {
+            TooltipHelper.ShowTooltipMessage(
+                $"File does not exist:{Environment.NewLine}{lastFilePath}",
+                true,
+                TimeSpan.FromSeconds(5));
+            return;
+        }
+
         vm.IsLoadingIndicatorShown.Value = true;
         var isViewStartupMenu = false;
         await Dispatcher.UIThread.InvokeAsync(() =>

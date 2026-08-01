@@ -143,6 +143,7 @@ public static class SettingsManager
             Zoom = GetDefaultZoom(),
             StartUp = new StartUp(),
             Navigation = new Navigation(),
+            Labeling = new LabelSettings(),
             Version = SettingsConfiguration.CurrentSettingsVersion
         };
 
@@ -253,6 +254,7 @@ public static class SettingsManager
         existingSettings.Zoom ??= GetDefaultZoom();
         existingSettings.StartUp ??= new StartUp();
         existingSettings.Navigation ??= new Navigation();
+        existingSettings.Labeling ??= new LabelSettings();
 
         existingSettings.Version = SettingsConfiguration.CurrentSettingsVersion;
         return existingSettings;

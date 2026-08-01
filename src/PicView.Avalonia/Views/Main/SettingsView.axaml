@@ -354,6 +354,18 @@
                         </ListBoxItem.Content>
                     </ListBoxItem>
 
+                    <ListBoxItem Tag="{x:Static viewModels1:SettingsCategory.Labeling}">
+                        <ListBoxItem.Content>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Image
+                                    Width="18"
+                                    Height="18"
+                                    Source="{StaticResource StarFilledDrawingImage}" />
+                                <TextBlock Classes="txt" Text="Labeling" />
+                            </StackPanel>
+                        </ListBoxItem.Content>
+                    </ListBoxItem>
+
                     <ListBoxItem Tag="{x:Static viewModels1:SettingsCategory.Keybindings}">
                         <ListBoxItem.Content>
                             <StackPanel Orientation="Horizontal" Spacing="8">
@@ -429,6 +441,11 @@
 
                         <config:LanguageView
                             x:Name="LanguageSection"
+                            Background="Transparent"
+                            Focusable="True" />
+
+                        <config:LabelingView
+                            x:Name="LabelingSection"
                             Background="Transparent"
                             Focusable="True" />
 

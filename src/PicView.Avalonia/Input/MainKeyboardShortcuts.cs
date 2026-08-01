@@ -93,9 +93,14 @@ public static class MainKeyboardShortcuts
     /// <param name="mainWindowViewModel">The main window view model.</param>
     public static async ValueTask MainWindow_KeysUpAsync(KeyEventArgs e, MainWindowViewModel? mainWindowViewModel)
     {
+        if (mainWindowViewModel is null)
+        {
+            return;
+        }
+
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
         {
-            if (CurrentKeys.Key is Key.LeftAlt or Key.RightAlt)
+            if (CurrentKeys?.Key is Key.LeftAlt or Key.RightAlt)
             {
                 mainWindowViewModel.TopTitlebarViewModel.ToggleMenu();
             }

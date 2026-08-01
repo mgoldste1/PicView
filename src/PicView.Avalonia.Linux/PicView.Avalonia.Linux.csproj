@@ -19,7 +19,6 @@
       
     <LangVersion>preview</LangVersion>
     <EnablePreviewFeatures>true</EnablePreviewFeatures>
-    <Features>$(Features);runtime-async=on</Features>
 
     <!-- AOT -->
     <PublishAot>true</PublishAot>

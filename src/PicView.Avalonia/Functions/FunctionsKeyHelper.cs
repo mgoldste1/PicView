@@ -266,7 +266,34 @@ public static class FunctionsKeyHelper
         AddBinding(starRating, "Set4Star", TranslationManager.Translation._4Star);
         AddBinding(starRating, "Set5Star", TranslationManager.Translation._5Star);
         AddBinding(starRating, "Set0Star", TranslationManager.Translation.RemoveStarRating);
-        
+
+        // Labeling
+        var fileManagementKeys = keybindings.FileManagementKeys.Value;
+        AddLabelBindings(fileManagementKeys);
+
+    }
+
+    /// <summary>
+    /// Adds label-related keybindings to the specified collection so they appear in the K window.
+    /// Discovers any "Label:&lt;text&gt;" bindings currently configured and the "ClearLabel" action.
+    /// </summary>
+    private static void AddLabelBindings(ObservableCollection<KeyBindingsModel> collection)
+    {
+        // Discover all currently-configured "Label:<text>" actions
+        var labelActions = KeybindingManager.CustomShortcuts?
+            .Where(x => x.Value.StartsWith("Label:", StringComparison.OrdinalIgnoreCase))
+            .Select(x => x.Value)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList() ?? [];
+
+        foreach (var action in labelActions)
+        {
+            var labelText = action["Label:".Length..].Trim();
+            var friendlyName = $"Apply label: {labelText}";
+            AddBinding(collection, action, friendlyName);
+        }
+
+        AddBinding(collection, "ClearLabel", "Clear label");
     }
 
     private static void AddBinding(

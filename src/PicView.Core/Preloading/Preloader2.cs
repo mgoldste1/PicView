@@ -62,7 +62,20 @@ public class Preloader2(Func<FileInfo, ValueTask<ImageModel>> imageModelLoader, 
                 // Piggyback on the existing load
                 await cachedValue.WaitForLoadingCompleteAsync().ConfigureAwait(false);
             }
-            
+
+            // A resurrected/stale entry (e.g. a file that left the folder and came back)
+            // can have a null image because its underlying image was disposed. Treat that
+            // as a cache miss and reload it from disk instead of returning a blank model.
+            if (cachedValue is { IsLoading: false, ImageModel.Image: null })
+            {
+                cachedValue.IsLoading = true;
+                cache.Add(ownerId, index, cachedValue, list.Count, isReverse);
+                var reloadedModel = await imageModelLoader(fileInfo).ConfigureAwait(false);
+                cachedValue.ImageModel = reloadedModel;
+                cachedValue.IsLoading = false;
+                return reloadedModel;
+            }
+
             // Ensure the requesting owner has a reference to this value in its dictionary
             cache.Add(ownerId, index, cachedValue, list.Count, isReverse);
 

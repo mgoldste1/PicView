@@ -97,7 +97,11 @@ public static class ConfigFileManager
             return currentUserPath;
         }
 
-        var localPath = file.LocalConfigPath;
-        return FileHelper.IsPathWritable(localPath) ? localPath : file.RoamingConfigPath;
+        // No existing config yet: default to the roaming AppData folder like a
+        // well-behaved desktop app, so settings survive rebuilds/clean and follow
+        // the user. Fall back to the app-local folder only if roaming isn't writable.
+        var roamingPath = file.RoamingConfigPath;
+        FileHelper.EnsureDirectoryExists(roamingPath);
+        return FileHelper.IsPathWritable(roamingPath) ? roamingPath : file.LocalConfigPath;
     }
 }

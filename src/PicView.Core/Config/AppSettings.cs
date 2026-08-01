@@ -18,6 +18,7 @@ public class AppSettings
     public Zoom? Zoom { get; set; }
     public StartUp? StartUp { get; set; }
     public Navigation? Navigation { get; set; }
+    public LabelSettings? Labeling { get; set; }
 }
 
 public class WindowProperties
@@ -463,5 +464,62 @@ public class Navigation
     /// Indicates whether navigation should move backward in the sequence when an image file is deleted.
     /// </summary>
     public bool IsNavigatingBackwardsWhenDeleting { get; set; } = true;
+}
+
+/// <summary>
+/// Configures the image labeling feature.
+/// </summary>
+public class LabelSettings
+{
+    /// <summary>
+    /// Whether to automatically advance to the next image after applying or replacing a label.
+    /// </summary>
+    public bool AutoAdvanceAfterLabel { get; set; } = true;
+
+    /// <summary>
+    /// Controls behavior when labeling a file that already has a different label.
+    /// </summary>
+    public RelabelPolicy RelabelPolicy { get; set; } = RelabelPolicy.Replace;
+
+    /// <summary>
+    /// The separator pattern between the filename stem and the label text.
+    /// May contain {LABEL} placeholder for template mode (e.g. "_({LABEL})").
+    /// If no placeholder, the label is appended after the separator: stem + separator + label.
+    /// </summary>
+    public string LabelSeparator { get; set; } = "_";
+
+    /// <summary>
+    /// Whether to store the original (pre-label) filename in file metadata on first label application.
+    /// </summary>
+    public bool StoreOriginalInMetadata { get; set; } = true;
+
+    /// <summary>
+    /// The labeling mode: filename-append or move-to-subfolder.
+    /// </summary>
+    public LabelMode Mode { get; set; } = LabelMode.FilenameAppend;
+}
+
+/// <summary>
+/// Defines behavior when the user applies a label to a file that already carries a different label.
+/// </summary>
+public enum RelabelPolicy
+{
+    /// <summary>Silently replace the existing label with the new one.</summary>
+    Replace = 0,
+    /// <summary>Block the operation and show a warning.</summary>
+    Block = 1,
+    /// <summary>Show a confirmation dialog asking the user whether to replace.</summary>
+    Prompt = 2
+}
+
+/// <summary>
+/// Defines how a label action is applied to a file.
+/// </summary>
+public enum LabelMode
+{
+    /// <summary>Rename the file by appending the label to the filename stem.</summary>
+    FilenameAppend = 0,
+    /// <summary>Move the file into a subfolder named after the label.</summary>
+    MoveToSubfolder = 1
 
 }
