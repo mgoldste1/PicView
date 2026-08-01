@@ -560,30 +560,32 @@ public static class LabelHelper
 
     #region Helpers
 
-    private static async Task PerformRenameAsync(TabViewModel tab, string oldPath, string newPath, MainWindowViewModel vm)
+    private static Task PerformRenameAsync(TabViewModel tab, string oldPath, string newPath, MainWindowViewModel vm)
     {
         try
         {
-            // The app is renaming this file itself; tell the watcher to ignore the resulting
-            // event so it doesn't override the current index (e.g. auto-advance after labeling).
-            FileWatcherService.SuppressNextRename(newPath);
-
             if (!FileHelper.RenameFile(oldPath, newPath))
             {
                 TooltipHelper.ShowTooltipMessage("Rename failed");
-                return;
+                return Task.CompletedTask;
             }
+
+            // Update the model's FileInfo (title/path) but keep the already-loaded image alive.
+            // The file-list, gallery and current index are reconciled by FileWatcherService's
+            // Renamed handler. We intentionally do NOT clear the cache / reload here: doing so
+            // disposes the currently displayed bitmap and races with rendering (ObjectDisposedException).
             var newFileInfo = new FileInfo(newPath);
             tab.FileInfo.Value = newFileInfo;
             tab.Model.FileInfo = newFileInfo;
             tab.UpdateTabTitle();
-            await tab.ImageIterator.ReloadAsync(tab.GetTabCancellation()).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
             DebugHelper.LogDebug(nameof(LabelHelper), nameof(PerformRenameAsync), ex);
             TooltipHelper.ShowTooltipMessage($"Error: {ex.Message}");
         }
+
+        return Task.CompletedTask;
     }
 
     private static async Task StoreOriginalFilenameAsync(FileInfo fileInfo, string originalFileName)

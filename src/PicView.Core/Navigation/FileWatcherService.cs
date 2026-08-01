@@ -21,51 +21,6 @@ public class FileWatcherService(
     private readonly Lock _lock = new();
     private readonly Func<string, string, int> _stringComparer = stringComparer ?? throw new ArgumentNullException(nameof(stringComparer));
 
-    // Tracks rename target paths that were initiated by the application itself (e.g. labeling).
-    // The FileSystemWatcher raises a Renamed event for these, but the app has already updated
-    // the tab/iterator state, so re-synchronizing here would fight with app-driven navigation
-    // (such as auto-advance after applying a label). Entries are consumed on the first matching
-    // event and expire after a short window in case the event never arrives.
-    private static readonly ConcurrentDictionary<string, DateTime> _selfInitiatedRenames =
-        new(StringComparer.OrdinalIgnoreCase);
-
-    private static readonly TimeSpan _selfInitiatedRenameTtl = TimeSpan.FromSeconds(5);
-
-    /// <summary>
-    /// Registers a rename that the application performs itself so the watcher ignores the
-    /// resulting Renamed event and does not override app-driven navigation state.
-    /// </summary>
-    public static void SuppressNextRename(string newFullPath)
-    {
-        if (string.IsNullOrEmpty(newFullPath))
-        {
-            return;
-        }
-
-        var now = DateTime.UtcNow;
-
-        // Opportunistically drop stale entries.
-        foreach (var kvp in _selfInitiatedRenames)
-        {
-            if (now - kvp.Value > _selfInitiatedRenameTtl)
-            {
-                _selfInitiatedRenames.TryRemove(kvp.Key, out _);
-            }
-        }
-
-        _selfInitiatedRenames[newFullPath] = now;
-    }
-
-    private static bool ConsumeSelfInitiatedRename(string newFullPath)
-    {
-        if (!_selfInitiatedRenames.TryRemove(newFullPath, out var timestamp))
-        {
-            return false;
-        }
-
-        return DateTime.UtcNow - timestamp <= _selfInitiatedRenameTtl;
-    }
-
     // Maps Directory Path -> (Watcher, Subscribers)
     private readonly
         ConcurrentDictionary<string, (FileSystemWatcher Watcher, IDisposable Subscription,
@@ -339,13 +294,6 @@ public class FileWatcherService(
     private async ValueTask OnFileRenamedAsync(TabViewModel tab, RenamedEventArgs e)
     {
         if (!e.FullPath.IsSupported())
-        {
-            return;
-        }
-
-        // If the app performed this rename (e.g. applying a label), it has already updated
-        // the tab/iterator and may have navigated away; skip to avoid overriding that state.
-        if (ConsumeSelfInitiatedRename(e.FullPath))
         {
             return;
         }
