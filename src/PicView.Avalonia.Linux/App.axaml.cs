@@ -58,6 +58,9 @@ public class App : Application, IPlatformSpecificService
     public Task<bool> DeleteFile(string path, bool recycle) =>
         throw new NotImplementedException();
 
+    public Task<bool> RestoreFromRecycleBin(string originalPath) =>
+        Task.FromResult(false);
+
     public void SetTaskbarProgress(ulong progress, ulong maximum)
     {
         throw new NotImplementedException();

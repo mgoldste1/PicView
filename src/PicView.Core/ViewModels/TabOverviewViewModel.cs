@@ -198,6 +198,28 @@ public class TabOverviewViewModel
     public async ValueTask NextFile() =>
         await NavigateDirectionalAsync(false, NavigateTo.Next).ConfigureAwait(false);
 
+    /// <summary>
+    /// Forces a full refresh of the active tab by rebuilding the folder file list from disk
+    /// (unlike Reload, which only refreshes the current image/cache).
+    /// </summary>
+    public async ValueTask ForceRefresh()
+    {
+        var tab = ActiveTab.Value;
+        if (SharedNavigation is null)
+        {
+            return;
+        }
+
+        var fileInfo = tab.FileInfo?.Value ?? tab.Model?.FileInfo;
+        if (fileInfo is null)
+        {
+            return;
+        }
+
+        var ct = tab.GetTabCancellation();
+        await SharedNavigation.RepopulateIterator(fileInfo, tab, ct).ConfigureAwait(false);
+    }
+
     public async ValueTask PrevFile() =>
         await NavigateDirectionalAsync(false, NavigateTo.Previous).ConfigureAwait(false);
 

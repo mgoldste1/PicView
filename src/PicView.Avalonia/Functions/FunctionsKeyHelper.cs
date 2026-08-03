@@ -184,11 +184,13 @@ public static class FunctionsKeyHelper
         AddBinding(fileManagement, "OpenWith", TranslationManager.Translation.OpenWith);
         AddBinding(fileManagement, "OpenInExplorer", TranslationManager.Translation.ShowInFolder);
         AddBinding(fileManagement, "Reload", TranslationManager.Translation.Reload);
+        AddBinding(fileManagement, "ForceRefresh", "Force refresh");
         AddBinding(fileManagement, "Save", TranslationManager.Translation.Save);
         AddBinding(fileManagement, "SaveAs", TranslationManager.Translation.SaveAs);
         AddBinding(fileManagement, "Print", TranslationManager.Translation.Print);
         AddBinding(fileManagement, "DeleteFile", TranslationManager.Translation.DeleteFile);
         AddBinding(fileManagement, "DeleteFilePermanently", TranslationManager.Translation.PermanentlyDelete);
+        AddBinding(fileManagement, "UndoDelete", "Undo delete");
         AddBinding(fileManagement, "Rename", TranslationManager.Translation.RenameFile);
         AddBinding(fileManagement, "ShowFileProperties", TranslationManager.Translation.FileProperties);
         

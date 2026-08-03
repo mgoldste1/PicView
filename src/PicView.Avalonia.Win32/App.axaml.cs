@@ -64,6 +64,9 @@ public class App : Application, IPlatformSpecificService
     public Task<bool> DeleteFile(string path, bool recycle) =>
         Task.Run(() => WinFileHelper.DeleteFile(path, recycle));
 
+    public Task<bool> RestoreFromRecycleBin(string originalPath) =>
+        Task.Run(() => WinFileHelper.RestoreFromRecycleBin(originalPath));
+
     public void SetTaskbarProgress(ulong progress, ulong maximum)
     {
         Dispatcher.Invoke(() =>

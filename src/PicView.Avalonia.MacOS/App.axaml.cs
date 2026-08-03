@@ -249,6 +249,9 @@ public class App : Application, IPlatformSpecificService
         await Task.Run(() => File.Delete(path));
         return !File.Exists(path); 
     }
-    
+
+    public Task<bool> RestoreFromRecycleBin(string originalPath) =>
+        Task.FromResult(false);
+
     #endregion
 }

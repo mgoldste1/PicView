@@ -25,6 +25,73 @@ public static class KeybindingManager
         else
         {
             UpdateKeybindings(keybindings);
+            BackfillMissingDefaultActions(platformSpecificService);
+        }
+    }
+
+    /// <summary>
+    /// Adds default keybindings for any action that is not already bound in the user's saved
+    /// keybindings, provided the default gesture is not already in use. This lets newly added
+    /// default actions (e.g. UndoDelete, ForceRefresh) reach existing users without discarding
+    /// their customizations.
+    /// </summary>
+    private static void BackfillMissingDefaultActions(IPlatformSpecificService platformSpecificService)
+    {
+        try
+        {
+            CustomShortcuts ??= new Dictionary<KeyGesture, string>();
+
+            var defaultJson = platformSpecificService.DefaultJsonKeyMap();
+            if (JsonSerializer.Deserialize(
+                    defaultJson, typeof(Dictionary<string, string>), SourceGenerationContext.Default)
+                is not Dictionary<string, string> defaults)
+            {
+                return;
+            }
+
+            // Actions the user already has bound (to any gesture).
+            var boundActions = new HashSet<string>(CustomShortcuts.Values, StringComparer.OrdinalIgnoreCase);
+
+            var added = false;
+            foreach (var kvp in defaults)
+            {
+                if (string.IsNullOrWhiteSpace(kvp.Value) || boundActions.Contains(kvp.Value))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    var gesture = KeyGesture.Parse(kvp.Key);
+                    if (gesture is null)
+                    {
+                        continue;
+                    }
+
+                    // Don't override a gesture the user has already assigned to something else.
+                    if (CustomShortcuts.Keys.Any(g => g.Equals(gesture)))
+                    {
+                        continue;
+                    }
+
+                    CustomShortcuts[gesture] = kvp.Value;
+                    boundActions.Add(kvp.Value);
+                    added = true;
+                }
+                catch (Exception ex)
+                {
+                    DebugHelper.LogDebug(nameof(KeybindingManager), nameof(BackfillMissingDefaultActions), ex);
+                }
+            }
+
+            if (added)
+            {
+                _ = UpdateKeyBindingsFile();
+            }
+        }
+        catch (Exception ex)
+        {
+            DebugHelper.LogDebug(nameof(KeybindingManager), nameof(BackfillMissingDefaultActions), ex);
         }
     }
 

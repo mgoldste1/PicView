@@ -32,4 +32,10 @@ public interface IPlatformSpecificService
     void InitiateFileAssociationService();
     
     Task<bool> DeleteFile(string path, bool recycle);
+
+    /// <summary>
+    /// Attempts to restore a previously recycled file back to its original location.
+    /// Returns true if the file was restored.
+    /// </summary>
+    Task<bool> RestoreFromRecycleBin(string originalPath);
 }

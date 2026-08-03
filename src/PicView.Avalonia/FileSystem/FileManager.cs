@@ -36,6 +36,9 @@ public static class FileManager
             }
             else
             {
+                // Move any associated video to the "deleted" folder and record for undo.
+                DeleteManager.MoveCompanionVideoAndRecord(path, recycle);
+
                 var success = await platformService.DeleteFile(path, recycle);
 
                 if (success)

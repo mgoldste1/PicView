@@ -120,7 +120,7 @@ public class FunctionsMapper(MainWindowViewModel vm, MainWindow mainWindow) : IF
             "SaveAsPDF" => SaveAsPDF,
             "Print" => Print,
             "Reload" => Reload,
-
+            "ForceRefresh" => ForceRefresh,
             // Copy functions
             "CopyFile" => CopyFile,
             "CopyFilePath" => CopyFilePath,
@@ -133,7 +133,7 @@ public class FunctionsMapper(MainWindowViewModel vm, MainWindow mainWindow) : IF
             // File functions
             "DeleteFile" => DeleteFile,
             "DeleteFilePermanently" => DeleteFilePermanently,
-            "Rename" => Rename,
+            "UndoDelete" => UndoDelete,
             "ShowFileProperties" => ShowFileProperties,
             "ShowSettingsFile" => ShowSettingsFile,
             "ShowKeybindingsFile" => ShowKeybindingsFile,
@@ -752,6 +752,45 @@ public class FunctionsMapper(MainWindowViewModel vm, MainWindow mainWindow) : IF
             .ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Undoes the most recent delete: restores the image from the recycle bin, moves any
+    /// associated video back from the "deleted" folder, and force-refreshes the folder.
+    /// </summary>
+    public async ValueTask UndoDelete()
+    {
+        if (Application.Current.DataContext is not CoreViewModel core || core.PlatformService is null)
+        {
+            return;
+        }
+
+        var entry = DeleteManager.PopLast();
+        if (entry is null)
+        {
+            TooltipHelper.ShowTooltipMessage("Nothing to undo");
+            return;
+        }
+
+        var restored = false;
+        if (entry.Recycled)
+        {
+            restored = await core.PlatformService.RestoreFromRecycleBin(entry.ImagePath).ConfigureAwait(false);
+        }
+
+        // Move the companion video back regardless, so it rejoins its (restored) thumbnail.
+        DeleteManager.RestoreCompanionVideo(entry);
+
+        if (restored || System.IO.File.Exists(entry.ImagePath))
+        {
+            await vm.WindowTabs.ForceRefresh().ConfigureAwait(false);
+            TooltipHelper.ShowTooltipMessage("Restored" + Environment.NewLine +
+                System.IO.Path.GetFileName(entry.ImagePath));
+        }
+        else
+        {
+            TooltipHelper.ShowTooltipMessage("Could not restore file");
+        }
+    }
+
     public ValueTask Rename()
     {
         RenameHelper.Rename(vm, mainWindow);
@@ -817,6 +856,12 @@ public class FunctionsMapper(MainWindowViewModel vm, MainWindow mainWindow) : IF
     /// <inheritdoc cref="Core.Navigation.Interfaces.IImageIterator.ReloadAsync"/>
     public async ValueTask Reload() =>
         await vm.WindowTabs.ActiveTab.CurrentValue.ImageIterator.ReloadAsync().ConfigureAwait(false);
+
+    /// <summary>
+    /// Forces a full folder refresh by rebuilding the file list from disk.
+    /// </summary>
+    public async ValueTask ForceRefresh() =>
+        await vm.WindowTabs.ForceRefresh().ConfigureAwait(false);
 
     public async ValueTask ResizeImage() =>
         await ResizeWindow();

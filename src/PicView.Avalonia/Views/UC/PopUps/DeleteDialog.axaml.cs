@@ -26,6 +26,7 @@ public partial class DeleteDialog : AnimatedPopUp
             CancelButton.Click += async delegate { await AnimatedClosing(); };
             ConfirmButton.Click += async delegate
             {
+                FileSystem.DeleteManager.MoveCompanionVideoAndRecord(file, recycle);
                 await core.PlatformService.DeleteFile(file, recycle);
                 await AnimatedClosing();
             };

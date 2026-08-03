@@ -637,6 +637,10 @@ public static class LabelHelper
                 return Task.CompletedTask;
             }
 
+            // If the image is a video "grid" thumbnail (e.g. "1.mp4.grid.jpg"), apply the
+            // same operation to the underlying video so it stays alongside its thumbnail.
+            TryRenameCompanionVideo(oldPath, newPath);
+
             // Update the model's FileInfo (title/path) but keep the already-loaded image alive.
             // The file-list, gallery and current index are reconciled by FileWatcherService's
             // Renamed handler. We intentionally do NOT clear the cache / reload here: doing so
@@ -653,6 +657,118 @@ public static class LabelHelper
         }
 
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Known video extensions whose "grid" thumbnails (e.g. "1.mp4.grid.jpg") should be
+    /// kept in sync when the thumbnail image is labeled/moved.
+    /// </summary>
+    private static readonly HashSet<string> VideoExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".mp4", ".m4v", ".mkv", ".webm", ".mov", ".avi", ".wmv", ".flv",
+        ".mpg", ".mpeg", ".m2ts", ".ts", ".mts", ".vob", ".ogv", ".3gp", ".3g2"
+    };
+
+    /// <summary>
+    /// When a labeled image is a video grid thumbnail, applies the same rename/move to the
+    /// underlying video file. The companion video name is derived by trimming the ".grid" marker
+    /// (and image extension) from the thumbnail name, e.g. "1.mp4.grid.jpg" -> "1.mp4".
+    /// </summary>
+    private static void TryRenameCompanionVideo(string oldImagePath, string newImagePath)
+    {
+        try
+        {
+            var settings = SettingsManager.Settings?.Labeling ?? new LabelSettings();
+
+            var oldVideoPath = GetCompanionVideoPath(oldImagePath, settings);
+            if (oldVideoPath is null || !File.Exists(oldVideoPath))
+            {
+                return;
+            }
+
+            var newVideoPath = GetCompanionVideoPath(newImagePath, settings);
+            if (newVideoPath is null ||
+                string.Equals(oldVideoPath, newVideoPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            if (File.Exists(newVideoPath))
+            {
+                return;
+            }
+
+            FileHelper.RenameFile(oldVideoPath, newVideoPath);
+        }
+        catch (Exception ex)
+        {
+            // Non-fatal: keep the image label operation successful even if the video move fails.
+            DebugHelper.LogDebug(nameof(LabelHelper), nameof(TryRenameCompanionVideo), ex);
+        }
+    }
+
+    /// <summary>
+    /// Resolves the existing companion video file for a grid-thumbnail image path, if one exists
+    /// on disk. Returns null when the image is not a recognized video grid thumbnail or the video
+    /// is not present. Intended for use by delete/undo flows so a video stays in sync with its
+    /// thumbnail.
+    /// </summary>
+    public static string? GetExistingCompanionVideoPath(string imagePath)
+    {
+        try
+        {
+            var settings = SettingsManager.Settings?.Labeling ?? new LabelSettings();
+            var videoPath = GetCompanionVideoPath(imagePath, settings);
+            return videoPath is not null && File.Exists(videoPath) ? videoPath : null;
+        }
+        catch (Exception ex)
+        {
+            DebugHelper.LogDebug(nameof(LabelHelper), nameof(GetExistingCompanionVideoPath), ex);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Derives the companion video path for a grid-thumbnail image path, reflecting the image's
+    /// current label onto the video's own name (label placed before the video extension, e.g.
+    /// "wafer.mp4" -> "wafer-_-_-red.mp4"). Returns null if the image is not a recognized video
+    /// grid thumbnail.
+    /// </summary>
+    private static string? GetCompanionVideoPath(string imagePath, LabelSettings settings)
+    {
+        var directory = Path.GetDirectoryName(imagePath);
+        if (string.IsNullOrEmpty(directory))
+        {
+            return null;
+        }
+
+        // Strip the image extension (".jpg"), leaving e.g. "wafer.mp4.grid" (clean) or
+        // "wafer.mp4.grid-_-_-red" (labeled). The label always sits after the ".grid" marker,
+        // so the segment before ".grid" is the clean, unlabeled video file name.
+        var imageStem = Path.GetFileNameWithoutExtension(imagePath);
+
+        const string gridMarker = ".grid";
+        var markerIndex = imageStem.IndexOf(gridMarker, StringComparison.OrdinalIgnoreCase);
+        if (markerIndex <= 0)
+        {
+            return null;
+        }
+
+        var cleanVideoName = imageStem[..markerIndex];
+        var videoExtension = Path.GetExtension(cleanVideoName);
+        if (string.IsNullOrEmpty(videoExtension) || !VideoExtensions.Contains(videoExtension))
+        {
+            return null;
+        }
+
+        // Apply the image's current label to the video's own name so the video carries the same
+        // label (and is reverted when the label is cleared). A null label yields the clean name.
+        var imageLabel = GetCurrentLabel(imageStem, settings);
+        var videoFileName = imageLabel is null
+            ? cleanVideoName
+            : BuildLabeledStem(Path.GetFileNameWithoutExtension(cleanVideoName), imageLabel, settings) + videoExtension;
+
+        return Path.Combine(directory, videoFileName);
     }
 
     private static async Task StoreOriginalFilenameAsync(FileInfo fileInfo, string originalFileName)
