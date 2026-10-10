@@ -505,6 +505,13 @@ public class LabelSettings
     /// The labeling mode: filename-append or move-to-subfolder.
     /// </summary>
     public LabelMode Mode { get; set; } = LabelMode.FilenameAppend;
+
+    /// <summary>
+    /// When enabled, pressing the delete key moves the image (and its companion video) into a
+    /// "deleted" subfolder instead of sending it to the recycle bin. The operation is still
+    /// undoable with Ctrl+Z.
+    /// </summary>
+    public bool MoveToDeletedFolderOnDelete { get; set; } = false;
 }
 
 /// <summary>

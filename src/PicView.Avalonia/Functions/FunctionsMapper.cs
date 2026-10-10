@@ -731,10 +731,31 @@ public class FunctionsMapper(MainWindowViewModel vm, MainWindow mainWindow) : IF
             return;
         }
 
+        var filePath = vm.WindowTabs.ActiveTab.CurrentValue.Model.FileInfo?.FullName;
+
+        // Optional mode: move the image into a "deleted" subfolder instead of recycling it.
+        if ((Settings.Labeling?.MoveToDeletedFolderOnDelete ?? false) && !string.IsNullOrEmpty(filePath))
+        {
+            var moved = DeleteManager.MoveImageToDeletedFolderAndRecord(filePath);
+            if (moved)
+            {
+                // The current file was just moved out of the folder, so advance to the next
+                // image. The FileWatcherService reconciles the removed file from the list,
+                // mirroring how subfolder-move labeling advances.
+                await vm.WindowTabs.NavigateDirectionalAsync(false, NavigateTo.Next).ConfigureAwait(false);
+                TooltipHelper.ShowTooltipMessage("Moved to deleted folder" + Environment.NewLine +
+                    System.IO.Path.GetFileName(filePath));
+            }
+            else
+            {
+                TooltipHelper.ShowTooltipMessage("Could not move file to deleted folder");
+            }
+            return;
+        }
+
         const bool recycle = true;
         await FileManager
-            .DeleteFileWithOptionalDialog(recycle, vm.WindowTabs.ActiveTab.CurrentValue.Model
-                .FileInfo?.FullName, core.PlatformService, mainWindow)
+            .DeleteFileWithOptionalDialog(recycle, filePath, core.PlatformService, mainWindow)
             .ConfigureAwait(false);
     }
     
@@ -794,6 +815,25 @@ public class FunctionsMapper(MainWindowViewModel vm, MainWindow mainWindow) : IF
         if (entry is null)
         {
             TooltipHelper.ShowTooltipMessage("Nothing to undo");
+            return;
+        }
+
+        // Move-to-deleted-folder mode: move the image back from the "deleted" subfolder.
+        if (entry.ImageDeletedPath is not null)
+        {
+            var movedBack = DeleteManager.RestoreImageFromDeletedFolder(entry);
+            DeleteManager.RestoreCompanionVideo(entry);
+
+            if (movedBack || System.IO.File.Exists(entry.ImagePath))
+            {
+                await vm.WindowTabs.ForceRefresh().ConfigureAwait(false);
+                TooltipHelper.ShowTooltipMessage("Restored" + Environment.NewLine +
+                    System.IO.Path.GetFileName(entry.ImagePath));
+            }
+            else
+            {
+                TooltipHelper.ShowTooltipMessage("Could not restore file");
+            }
             return;
         }
 

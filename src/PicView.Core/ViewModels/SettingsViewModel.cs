@@ -123,6 +123,12 @@ public class SettingsViewModel : IDisposable
                 Settings.Labeling.LabelSeparator = string.IsNullOrEmpty(x) ? "_" : x;
                 await SaveSettingsAsync();
             }, DebugHelper.LogError(nameof(SettingsViewModel), nameof(LabelSeparator))).AddTo(ref _disposables);
+        Observable.EveryValueChanged(this, x => x.IsMovingToDeletedFolderOnDelete.CurrentValue)
+            .SubscribeAwait(async (x, _) =>
+            {
+                Settings.Labeling.MoveToDeletedFolderOnDelete = x;
+                await SaveSettingsAsync();
+            }, DebugHelper.LogError(nameof(SettingsViewModel), nameof(IsMovingToDeletedFolderOnDelete))).AddTo(ref _disposables);
         
         ToggleUsingTouchpadCommand = new ReactiveCommand(_ =>
         {
@@ -277,6 +283,9 @@ public class SettingsViewModel : IDisposable
 
     public BindableReactiveProperty<string> LabelSeparator { get; } =
         new((Settings.Labeling ?? new LabelSettings()).LabelSeparator);
+
+    public BindableReactiveProperty<bool> IsMovingToDeletedFolderOnDelete { get; } =
+        new((Settings.Labeling ?? new LabelSettings()).MoveToDeletedFolderOnDelete);
 
     public BindableReactiveProperty<bool> IsShowingRecycleDialog { get; } =
         new(Settings.UIProperties.ShowRecycleConfirmation);

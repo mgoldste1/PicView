@@ -42,6 +42,17 @@
 				ToolTip.Tip="Saves the original filename in EXIF metadata the first time an image is labeled." />
 		</Border>
 
+		<!--  Move to deleted folder on delete  -->
+		<Border Classes="searchBorder">
+			<customControls:TextToggleButton
+				x:Name="MoveToDeletedFolderToggleButton"
+				Classes="altHover settingsToggleButton"
+				IsChecked="{CompiledBinding SettingsViewModel.IsMovingToDeletedFolderOnDelete.Value,
+											Mode=TwoWay}"
+				Text="Move to a &quot;deleted&quot; subfolder on delete"
+				ToolTip.Tip="When enabled, pressing the delete key moves the image (and its companion video) into a &quot;deleted&quot; subfolder instead of the recycle bin. Still undoable with Ctrl+Z." />
+		</Border>
+
 		<!--  Relabel policy  -->
 		<Border Classes="searchBorder">
 			<StackPanel>

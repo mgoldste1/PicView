@@ -754,19 +754,24 @@ public static class LabelHelper
             return null;
         }
 
-        // Strip the image extension (".jpg"), leaving e.g. "wafer.mp4.grid" (clean) or
-        // "wafer.mp4.grid-_-_-red" (labeled). The label always sits after the ".grid" marker,
-        // so the segment before ".grid" is the clean, unlabeled video file name.
+        // Strip the image extension ("jpg"), leaving e.g. "wafer.mp4.grid" (clean) or a labeled
+        // form. The label may sit after the ".grid" marker (suffix separators like "-_-_-") OR be
+        // placed anywhere by a full template (e.g. "{LABEL}_{FILENAME}" -> "red_wafer.mp4.grid").
+        // Remove the label from the whole stem first so the clean video name never includes it;
+        // otherwise BuildLabeledStem would re-apply the label and double it up.
         var imageStem = Path.GetFileNameWithoutExtension(imagePath);
 
+        var imageLabel = GetCurrentLabel(imageStem, settings);
+        var cleanImageStem = StripLabelFromStem(imageStem, settings);
+
         const string gridMarker = ".grid";
-        var markerIndex = imageStem.IndexOf(gridMarker, StringComparison.OrdinalIgnoreCase);
+        var markerIndex = cleanImageStem.IndexOf(gridMarker, StringComparison.OrdinalIgnoreCase);
         if (markerIndex <= 0)
         {
             return null;
         }
 
-        var cleanVideoName = imageStem[..markerIndex];
+        var cleanVideoName = cleanImageStem[..markerIndex];
         var videoExtension = Path.GetExtension(cleanVideoName);
         if (string.IsNullOrEmpty(videoExtension) || !VideoExtensions.Contains(videoExtension))
         {
@@ -775,7 +780,6 @@ public static class LabelHelper
 
         // Apply the image's current label to the video's own name so the video carries the same
         // label (and is reverted when the label is cleared). A null label yields the clean name.
-        var imageLabel = GetCurrentLabel(imageStem, settings);
         var videoFileName = imageLabel is null
             ? cleanVideoName
             : BuildLabeledStem(Path.GetFileNameWithoutExtension(cleanVideoName), imageLabel, settings) + videoExtension;

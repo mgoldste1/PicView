@@ -13,11 +13,17 @@ public sealed class DeleteHistoryEntry
     /// <summary>True if the image was sent to the recycle bin (restorable), false if permanently deleted.</summary>
     public required bool Recycled { get; init; }
 
-    /// <summary>Original full path of the associated video, if any.</summary>
+    /// <summary> Original full path of the associated video, if any.</summary>
     public string? VideoOriginalPath { get; init; }
 
     /// <summary>Path the associated video was moved to inside the "deleted" folder, if any.</summary>
     public string? VideoDeletedPath { get; init; }
+
+    /// <summary>
+    /// Path the image itself was moved to inside the "deleted" folder, when the move-to-deleted
+    /// -folder mode is used instead of a recycle-bin delete. Null for recycle-bin deletes.
+    /// </summary>
+    public string? ImageDeletedPath { get; init; }
 }
 
 /// <summary>
@@ -73,6 +79,55 @@ public static class DeleteManager
     }
 
     /// <summary>
+    /// Moves the image (and its companion video, if any) into a "deleted" subfolder instead of
+    /// deleting it, and records a history entry for undo. Returns true if the image was moved.
+    /// </summary>
+    public static bool MoveImageToDeletedFolderAndRecord(string imagePath)
+    {
+        // A deletion invalidates any pending label undo: a label can only be undone while it
+        // is still the most recent action.
+        LabelUndoManager.Clear();
+
+        try
+        {
+            string? videoOriginal = null;
+            string? videoDeleted = null;
+
+            var companion = LabelHelper.GetExistingCompanionVideoPath(imagePath);
+            if (companion is not null)
+            {
+                videoOriginal = companion;
+                videoDeleted = MoveToDeletedFolder(companion);
+            }
+
+            var imageDeleted = MoveToDeletedFolder(imagePath);
+            if (imageDeleted is null)
+            {
+                return false;
+            }
+
+            lock (HistoryLock)
+            {
+                History.Push(new DeleteHistoryEntry
+                {
+                    ImagePath = imagePath,
+                    Recycled = false,
+                    VideoOriginalPath = videoOriginal,
+                    VideoDeletedPath = videoDeleted,
+                    ImageDeletedPath = imageDeleted
+                });
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            DebugHelper.LogDebug(nameof(DeleteManager), nameof(MoveImageToDeletedFolderAndRecord), ex);
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Retrieves and removes the most recent delete history entry, if any.
     /// </summary>
     public static DeleteHistoryEntry? PopLast()
@@ -80,6 +135,40 @@ public static class DeleteManager
         lock (HistoryLock)
         {
             return History.Count > 0 ? History.Pop() : null;
+        }
+    }
+
+    /// <summary>
+    /// Moves the image back from the "deleted" folder to its original location, when it was
+    /// deleted via the move-to-deleted-folder mode. Returns true if the image was moved back.
+    /// </summary>
+    public static bool RestoreImageFromDeletedFolder(DeleteHistoryEntry entry)
+    {
+        try
+        {
+            if (entry.ImageDeletedPath is null)
+            {
+                return false;
+            }
+
+            if (!File.Exists(entry.ImageDeletedPath) || File.Exists(entry.ImagePath))
+            {
+                return false;
+            }
+
+            var directory = Path.GetDirectoryName(entry.ImagePath);
+            if (!string.IsNullOrEmpty(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            File.Move(entry.ImageDeletedPath, entry.ImagePath);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            DebugHelper.LogDebug(nameof(DeleteManager), nameof(RestoreImageFromDeletedFolder), ex);
+            return false;
         }
     }
 
