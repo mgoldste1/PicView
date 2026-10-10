@@ -1,0 +1,75 @@
+<Window
+	xmlns="https://github.com/avaloniaui"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	x:Class="PicView.Avalonia.Views.LabelOverviewWindow"
+	Title="Label shortcuts"
+	CanResize="False"
+	ShowActivated="False"
+	ShowInTaskbar="False"
+	Topmost="True"
+	SystemDecorations="BorderOnly"
+	SizeToContent="WidthAndHeight"
+	WindowStartupLocation="Manual">
+
+	<Border
+		BorderBrush="{DynamicResource WindowBorderColor}"
+		BorderThickness="1"
+		Background="{DynamicResource MainBackgroundColor}"
+		CornerRadius="6"
+		PointerPressed="MoveWindow"
+		Padding="2">
+		<StackPanel Margin="10" MinWidth="180">
+			<DockPanel Margin="0,0,0,8" LastChildFill="True">
+				<Button
+					DockPanel.Dock="Right"
+					Content="✕"
+					Click="Close"
+					Padding="6,0"
+					Margin="8,0,0,0"
+					VerticalAlignment="Top"
+					Background="Transparent"
+					BorderThickness="0"
+					Foreground="{DynamicResource MainTextColor}"
+					ToolTip.Tip="Close" />
+				<TextBlock
+					Text="Label shortcuts"
+					FontWeight="Bold"
+					VerticalAlignment="Center"
+					Foreground="{DynamicResource MainTextColor}" />
+			</DockPanel>
+
+			<ItemsControl x:Name="LabelItems">
+				<ItemsControl.ItemTemplate>
+					<DataTemplate x:CompileBindings="False">
+						<Grid ColumnDefinitions="Auto,*" Margin="0,2">
+							<Border
+								Grid.Column="0"
+								MinWidth="28"
+								Margin="0,0,10,0"
+								Padding="6,2"
+								CornerRadius="4"
+								Background="{DynamicResource SecondaryBackgroundColor}">
+								<TextBlock
+									Text="{Binding Key}"
+									HorizontalAlignment="Center"
+									FontWeight="SemiBold"
+									Foreground="{DynamicResource MainTextColor}" />
+							</Border>
+							<TextBlock
+								Grid.Column="1"
+								VerticalAlignment="Center"
+								Text="{Binding Label}"
+								Foreground="{DynamicResource MainTextColor}" />
+						</Grid>
+					</DataTemplate>
+				</ItemsControl.ItemTemplate>
+			</ItemsControl>
+
+			<TextBlock
+				x:Name="EmptyText"
+				Text="No label shortcuts configured."
+				IsVisible="False"
+				Foreground="{DynamicResource MainTextColor}" />
+		</StackPanel>
+	</Border>
+</Window>

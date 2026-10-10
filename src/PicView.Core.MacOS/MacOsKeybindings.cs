@@ -83,7 +83,8 @@ public static class MacOsKeybindings
                                                 "D2": "Label:green",
                                                 "D3": "Label:blue",
                                                 "D4": "Label:yellow",
-                                                "D0": "ClearLabel"
+                                                "D0": "ClearLabel",
+                                                "Cmd+L": "LabelOverviewWindow"
                                               }
                                               """;
 }

@@ -107,6 +107,7 @@ public class FunctionsMapper(MainWindowViewModel vm, MainWindow mainWindow) : IF
             "ResizeWindow" => ResizeWindow,
             "SettingsWindow" => SettingsWindow,
             "KeybindingsWindow" => KeybindingsWindow,
+            "LabelOverviewWindow" => LabelOverviewWindow,
             "BatchResizeWindow" => BatchResizeWindow,
             "FileAssociationsWindow" => FileAssociationsWindow,
             "ConvertWindow" => ConvertWindow,
@@ -591,6 +592,40 @@ public class FunctionsMapper(MainWindowViewModel vm, MainWindow mainWindow) : IF
     public ValueTask KeybindingsWindow()
     {
         vm?.PlatformWindowService?.ShowKeybindingsWindow();
+        return ValueTask.CompletedTask;
+    }
+
+    private Views.LabelOverviewWindow? _labelOverviewWindow;
+
+    public ValueTask LabelOverviewWindow()
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (_labelOverviewWindow is not null)
+            {
+                _labelOverviewWindow.Close();
+                _labelOverviewWindow = null;
+                return;
+            }
+
+            var window = new Views.LabelOverviewWindow();
+            window.Closed += (_, _) => _labelOverviewWindow = null;
+            _labelOverviewWindow = window;
+
+            if (mainWindow is not null)
+            {
+                // Position near the top-right of the main window without stealing focus.
+                window.Position = new PixelPoint(
+                    mainWindow.Position.X + (int)mainWindow.Width + 10,
+                    mainWindow.Position.Y);
+                window.Show(mainWindow);
+            }
+            else
+            {
+                window.Show();
+            }
+        });
+
         return ValueTask.CompletedTask;
     }
 

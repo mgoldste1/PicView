@@ -86,6 +86,7 @@ public static class WindowsKeybindings
                                                "D3": "Label:blue",
                                                "D4": "Label:yellow",
                                                "D0": "ClearLabel",
+                                               "Ctrl+L": "LabelOverviewWindow",
                                                "Ctrl+T": "NewTab",
                                                "Ctrl+W": "CloseTab",
                                                }

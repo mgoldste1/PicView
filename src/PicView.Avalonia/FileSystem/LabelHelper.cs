@@ -761,8 +761,13 @@ public static class LabelHelper
         // otherwise BuildLabeledStem would re-apply the label and double it up.
         var imageStem = Path.GetFileNameWithoutExtension(imagePath);
 
-        var imageLabel = GetCurrentLabel(imageStem, settings);
-        var cleanImageStem = StripLabelFromStem(imageStem, settings);
+        // Label strip/apply only makes sense in filename-append mode. In subfolder mode the file
+        // keeps its original (unlabeled) name and only the folder changes, so parsing a label out
+        // of the stem would misfire on any name containing the separator character (e.g. "_").
+        var isFilenameMode = settings.Mode == LabelMode.FilenameAppend;
+
+        var imageLabel = isFilenameMode ? GetCurrentLabel(imageStem, settings) : null;
+        var cleanImageStem = isFilenameMode ? StripLabelFromStem(imageStem, settings) : imageStem;
 
         const string gridMarker = ".grid";
         var markerIndex = cleanImageStem.IndexOf(gridMarker, StringComparison.OrdinalIgnoreCase);
