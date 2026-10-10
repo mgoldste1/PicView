@@ -1,0 +1,14 @@
+<Solution>
+  <Project Path="PicView.Avalonia.Win32/PicView.Avalonia.Win32.csproj">
+    <Platform Project="x64" />
+  </Project>
+  <Project Path="PicView.Avalonia/PicView.Avalonia.csproj">
+    <Platform Project="x64" />
+  </Project>
+  <Project Path="PicView.Core.WindowsNT/PicView.Core.WindowsNT.csproj">
+    <Platform Project="x64" />
+  </Project>
+  <Project Path="PicView.Core/PicView.Core.csproj">
+    <Platform Project="x64" />
+  </Project>
+</Solution>
