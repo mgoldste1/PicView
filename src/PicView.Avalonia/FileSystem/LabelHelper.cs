@@ -353,10 +353,10 @@ public static class LabelHelper
 
         TooltipHelper.ShowTooltipMessage($"Label: {label}");
 
-        if (settings.AutoAdvanceAfterLabel)
-        {
-            await vm.WindowTabs.NavigateDirectionalAsync(false, NavigateTo.Next).ConfigureAwait(false);
-        }
+        // In subfolder mode the file was just moved out of the current folder, so it no longer
+        // exists at the current index. Always advance to the next picture regardless of the
+        // AutoAdvanceAfterLabel setting, otherwise the view is left on a file that's gone.
+        await vm.WindowTabs.NavigateDirectionalAsync(false, NavigateTo.Next).ConfigureAwait(false);
     }
 
     private static bool IsInLabelSubfolder(string directory)
@@ -639,7 +639,18 @@ public static class LabelHelper
 
             // If the image is a video "grid" thumbnail (e.g. "1.mp4.grid.jpg"), apply the
             // same operation to the underlying video so it stays alongside its thumbnail.
-            TryRenameCompanionVideo(oldPath, newPath);
+            var settings = SettingsManager.Settings?.Labeling ?? new LabelSettings();
+            var oldVideoPath = GetCompanionVideoPath(oldPath, settings);
+            var newVideoPath = GetCompanionVideoPath(newPath, settings);
+            var videoMoved = TryRenameCompanionVideo(oldPath, newPath);
+
+            // Record this operation so Ctrl+Z can undo it, but only while it remains the most
+            // recent action (a later label overwrites this record; a deletion clears it).
+            LabelUndoManager.Record(
+                oldPath,
+                newPath,
+                videoMoved ? oldVideoPath : null,
+                videoMoved ? newVideoPath : null);
 
             // Update the model's FileInfo (title/path) but keep the already-loaded image alive.
             // The file-list, gallery and current index are reconciled by FileWatcherService's
@@ -674,7 +685,7 @@ public static class LabelHelper
     /// underlying video file. The companion video name is derived by trimming the ".grid" marker
     /// (and image extension) from the thumbnail name, e.g. "1.mp4.grid.jpg" -> "1.mp4".
     /// </summary>
-    private static void TryRenameCompanionVideo(string oldImagePath, string newImagePath)
+    private static bool TryRenameCompanionVideo(string oldImagePath, string newImagePath)
     {
         try
         {
@@ -683,27 +694,28 @@ public static class LabelHelper
             var oldVideoPath = GetCompanionVideoPath(oldImagePath, settings);
             if (oldVideoPath is null || !File.Exists(oldVideoPath))
             {
-                return;
+                return false;
             }
 
             var newVideoPath = GetCompanionVideoPath(newImagePath, settings);
             if (newVideoPath is null ||
                 string.Equals(oldVideoPath, newVideoPath, StringComparison.OrdinalIgnoreCase))
             {
-                return;
+                return false;
             }
 
             if (File.Exists(newVideoPath))
             {
-                return;
+                return false;
             }
 
-            FileHelper.RenameFile(oldVideoPath, newVideoPath);
+            return FileHelper.RenameFile(oldVideoPath, newVideoPath);
         }
         catch (Exception ex)
         {
             // Non-fatal: keep the image label operation successful even if the video move fails.
             DebugHelper.LogDebug(nameof(LabelHelper), nameof(TryRenameCompanionVideo), ex);
+            return false;
         }
     }
 

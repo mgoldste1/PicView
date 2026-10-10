@@ -1,5 +1,6 @@
 ﻿using Avalonia;
 using PicView.Avalonia.CustomControls;
+using PicView.Avalonia.UI;
 using PicView.Core.Localization;
 using PicView.Core.ViewModels;
 
@@ -27,7 +28,18 @@ public partial class DeleteDialog : AnimatedPopUp
             ConfirmButton.Click += async delegate
             {
                 FileSystem.DeleteManager.MoveCompanionVideoAndRecord(file, recycle);
-                await core.PlatformService.DeleteFile(file, recycle);
+                var success = await core.PlatformService.DeleteFile(file, recycle);
+                if (success)
+                {
+                    var msg = recycle
+                        ? TranslationManager.Translation.SentFileToRecycleBin
+                        : TranslationManager.Translation.DeletedFile;
+                    TooltipHelper.ShowTooltipMessage(msg + Environment.NewLine + Path.GetFileName(file));
+                }
+                else if (File.Exists(file))
+                {
+                    TooltipHelper.ShowTooltipMessage(TranslationManager.Translation.UnexpectedError, true);
+                }
                 await AnimatedClosing();
             };
 

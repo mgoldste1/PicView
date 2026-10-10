@@ -39,6 +39,10 @@ public static class DeleteManager
     /// </summary>
     public static void MoveCompanionVideoAndRecord(string imagePath, bool recycle)
     {
+        // A deletion invalidates any pending label undo: a label can only be undone while it
+        // is still the most recent action.
+        LabelUndoManager.Clear();
+
         try
         {
             string? videoOriginal = null;

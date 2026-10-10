@@ -763,6 +763,33 @@ public class FunctionsMapper(MainWindowViewModel vm, MainWindow mainWindow) : IF
             return;
         }
 
+        // Prefer undoing the most recent label operation when it was the immediately previous
+        // action (a later label overwrites it; a deletion clears it). This lets a mistaken
+        // subfolder-move label send the file back to the main folder.
+        var labelEntry = LabelUndoManager.PopLast();
+        if (labelEntry is not null)
+        {
+            if (LabelUndoManager.Undo(labelEntry))
+            {
+                // Point the active tab at the restored path before refreshing; otherwise the
+                // iterator repopulates from the now-missing labeled path and navigation breaks.
+                var tab = vm.WindowTabs.ActiveTab.CurrentValue;
+                var restoredFileInfo = new System.IO.FileInfo(labelEntry.ImageOldPath);
+                tab.FileInfo.Value = restoredFileInfo;
+                tab.Model.FileInfo = restoredFileInfo;
+                tab.UpdateTabTitle();
+
+                await vm.WindowTabs.ForceRefresh().ConfigureAwait(false);
+                TooltipHelper.ShowTooltipMessage("Label undone" + Environment.NewLine +
+                    System.IO.Path.GetFileName(labelEntry.ImageOldPath));
+            }
+            else
+            {
+                TooltipHelper.ShowTooltipMessage("Could not undo label");
+            }
+            return;
+        }
+
         var entry = DeleteManager.PopLast();
         if (entry is null)
         {
