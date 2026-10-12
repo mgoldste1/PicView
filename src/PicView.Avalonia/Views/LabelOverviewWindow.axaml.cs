@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
+using Avalonia.Threading;
 using PicView.Avalonia.Input;
 
 namespace PicView.Avalonia.Views;
@@ -14,6 +15,14 @@ public partial class LabelOverviewWindow : Window
     {
         InitializeComponent();
         PopulateLabels();
+
+        KeybindingManager.ShortcutsChanged += OnShortcutsChanged;
+        Closed += (_, _) => KeybindingManager.ShortcutsChanged -= OnShortcutsChanged;
+    }
+
+    private void OnShortcutsChanged()
+    {
+        Dispatcher.UIThread.Post(PopulateLabels);
     }
 
     private void InitializeComponent()

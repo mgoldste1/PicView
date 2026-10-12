@@ -15,6 +15,12 @@ public static class KeybindingManager
 {
     public static Dictionary<KeyGesture, string>? CustomShortcuts { get; private set; }
 
+    /// <summary>
+    /// Raised after the keybindings have been persisted, so open UI (such as the
+    /// label overview window) can refresh to reflect added/changed shortcuts.
+    /// </summary>
+    public static event Action? ShortcutsChanged;
+
     public static async ValueTask LoadKeybindings(IPlatformSpecificService platformSpecificService)
     {
         var keybindings = await KeybindingFunctions.LoadKeyBindingsFile().ConfigureAwait(false);
@@ -128,6 +134,8 @@ public static class KeybindingManager
         {
             DebugHelper.LogDebug(nameof(KeybindingManager), nameof(UpdateKeyBindingsFile), exception);
         }
+
+        ShortcutsChanged?.Invoke();
     }
 
     private static void PopulateCustomShortcuts(Dictionary<string, string> keyValues)

@@ -32,7 +32,12 @@ public static class ClipboardPasteOperations
             var text = await clipboard.TryGetTextAsync();
             if (!string.IsNullOrWhiteSpace(text))
             {
-                return await vm.WindowTabs.LoadFromStringAsync(text);
+                var loaded = await vm.WindowTabs.LoadFromStringAsync(text);
+                if (!loaded)
+                {
+                    UI.TooltipHelper.ShowTooltipMessage("No images found at the pasted path");
+                }
+                return loaded;
             }
 
             // Try to paste image data

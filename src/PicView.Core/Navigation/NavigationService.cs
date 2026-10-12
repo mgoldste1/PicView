@@ -171,17 +171,18 @@ public class NavigationService(
         }
     }
 
-    public async ValueTask LoadFromDirectoryAsync(FileInfo source, TabViewModel tab, CancellationTokenSource ct)
+    public async ValueTask<bool> LoadFromDirectoryAsync(FileInfo source, TabViewModel tab, CancellationTokenSource ct)
     {
         var files = await Task.Run(() => FileListRetriever.RetrieveFiles(source, stringComparer), ct.Token).ConfigureAwait(false);
         if (files.Count is 0)
         {
-            return;
+            return false;
         }
 
         var first = files[0];
         await RepopulateIterator(first, tab, ct, files).ConfigureAwait(false);
         tab.ArchiveExtractionService.Cleanup();
+        return true;
     }
 
     public async ValueTask<bool> LoadFromStringAsync(string source, TabViewModel tab, CancellationTokenSource ct)
@@ -204,8 +205,7 @@ public class NavigationService(
                 return true;
             case FileTypeResolver.LoadAbleFileType.Directory:
             {
-                await LoadFromDirectoryAsync(new FileInfo(check.Value.Data), tab, ct).ConfigureAwait(false);
-                return true;
+                return await LoadFromDirectoryAsync(new FileInfo(check.Value.Data), tab, ct).ConfigureAwait(false);
             }
             case FileTypeResolver.LoadAbleFileType.Web:
                 await LoadFromUrlAsync(check.Value.Data, tab, ct).ConfigureAwait(false);
